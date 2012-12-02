@@ -1011,8 +1011,15 @@ VARP(zoomautosens, 0, 1, 1);
 FVARP(sensitivity, 1e-3f, 3, 1000);
 FVARP(mouse_yaw, -1.0f, 0.022f, 1.0f);
 FVARP(mouse_pitch, -1.0f, 0.022f, 1.0f);
-// FVARP(sensitivityscale, 1e-3f, 1, 1000);
-// VARP(invmouse, 0, 0, 1);
+ICOMMAND(sensitivityscale, "f", (float *s),
+         {
+             mouse_yaw = 1.0f / (33.0f * *s);
+             mouse_pitch = mouse_pitch < 0 ? -mouse_yaw : mouse_yaw;
+         });
+ICOMMAND(invmouse, "i", (int *i),
+         {
+             mouse_pitch = (*i ? -1 : 1) * fabs(mouse_pitch);
+         });
 FVARP(mouseaccel, 0, 0, 1000);
  
 VAR(thirdperson, 0, 0, 2);
