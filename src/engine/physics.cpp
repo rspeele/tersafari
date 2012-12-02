@@ -666,7 +666,7 @@ static inline bool plcollide(physent *d, const vec &dir, physent *o)
     return true;
 }
 
-bool plcollide(physent *d, const vec &dir)    // collide with player or monster
+bool plcollide(physent *d, const vec &dir, physent *safe = NULL)    // collide with player or monster
 {
     if(d->type==ENT_CAMERA || d->state!=CS_ALIVE) return true;
     loopdynentcache(x, y, d->o, d->radius)
@@ -675,7 +675,7 @@ bool plcollide(physent *d, const vec &dir)    // collide with player or monster
         loopv(dynents)
         {
             physent *o = dynents[i];
-            if(o==d || d->o.reject(o->o, d->radius+o->radius)) continue;
+            if(o==d || o==safe || d->o.reject(o->o, d->radius+o->radius)) continue;
             switch(d->collidetype)
             {
                 case COLLIDE_ELLIPSE:
@@ -1114,7 +1114,7 @@ static inline bool octacollide(physent *d, const vec &dir, float cutoff, const i
 }
 
 // all collision happens here
-bool collide(physent *d, const vec &dir, float cutoff, bool playercol)
+bool collide(physent *d, const vec &dir, float cutoff, bool playercol, physent *safe)
 {
     inside = false;
     hitplayer = NULL;
@@ -1123,7 +1123,7 @@ bool collide(physent *d, const vec &dir, float cutoff, bool playercol)
          bs(int(d->radius*2), int(d->radius*2), int(d->eyeheight+d->aboveeye));
     bs.add(2);  // guard space for rounding errors
     if(!octacollide(d, dir, cutoff, bo, bs)) return false;//, worldroot, ivec(0, 0, 0), worldsize>>1)) return false; // collide with world
-    return !playercol || plcollide(d, dir);
+    return !playercol || plcollide(d, dir, safe);
 }
 
 void recalcdir(physent *d, const vec &oldvel, vec &dir)
@@ -1461,10 +1461,26 @@ bool move(physent *d, vec &dir)
     return !collided;
 }
 
-bool bounce(physent *d, float secs, float elasticity, float waterfric)
+bool bounce(physent *d, float secs, float elasticity, float waterfric, physent *safe)
 {
     // make sure bouncers don't start inside geometry
-    if(d->physstate!=PHYS_BOUNCE && !collide(d, vec(0, 0, 0), 0, false)) return true;
+    if(d->physstate!=PHYS_BOUNCE && !collide(d, vec(0, 0, 0), 0, false))
+    {
+        if(safe) // assume safe is the originator of the bouncer and use that to escape geometry
+        {
+            // a bouncer with a safe entity stuck inside geometry is
+            // probably a grenade fired by somebody staring into a
+            // wall. so, rather than try to figure out which wall it
+            // should come out of and where, just move it to the safe
+            // entity and reverse its direction. close enough to seem
+            // like it bounced off the wall.
+            d->o = safe->o;
+            d->vel.neg();
+            d->vel.div(2);
+        }
+        else return true;
+    }
+
     int mat = lookupmaterial(vec(d->o.x, d->o.y, d->o.z + (d->aboveeye - d->eyeheight)/2));
     bool water = isliquid(mat);
     if(water)
@@ -1479,7 +1495,7 @@ bool bounce(physent *d, float secs, float elasticity, float waterfric)
         vec dir(d->vel);
         dir.mul(secs);
         d->o.add(dir);
-        if(collide(d, dir))
+        if(collide(d, dir, 0.0f, true, safe))
         {
             if(inside)
             {
@@ -1502,7 +1518,7 @@ bool bounce(physent *d, float secs, float elasticity, float waterfric)
         if(d->o == old) return !hitplayer;
         d->physstate = PHYS_BOUNCE;
     }
-    return hitplayer!=0;
+    return hitplayer!=0 && hitplayer!=safe;
 }
 
 void avoidcollision(physent *d, const vec &dir, physent *obstacle, float space)
@@ -1916,7 +1932,7 @@ void moveplayer(physent *pl, int moveres, bool local)
     }
 }
 
-bool bounce(physent *d, float elasticity, float waterfric)
+bool bounce(physent *d, float elasticity, float waterfric, physent *safe)
 {
     if(physsteps <= 0)
     {
@@ -1928,10 +1944,10 @@ bool bounce(physent *d, float elasticity, float waterfric)
     bool hitplayer = false;
     loopi(physsteps-1)
     {
-        if(bounce(d, physframetime/1000.0f, elasticity, waterfric)) hitplayer = true;
+        if(bounce(d, physframetime/1000.0f, elasticity, waterfric, safe)) hitplayer = true;
     }
     d->deltapos = d->o;
-    if(bounce(d, physframetime/1000.0f, elasticity, waterfric)) hitplayer = true;
+    if(bounce(d, physframetime/1000.0f, elasticity, waterfric, safe)) hitplayer = true;
     d->newpos = d->o;
     d->deltapos.sub(d->newpos);
     interppos(d);
