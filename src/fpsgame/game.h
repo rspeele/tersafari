@@ -323,15 +323,15 @@ enum
 static struct itemstat { int add, max, sound; const char *name; int icon, info; } itemstats[] =
 {
     {10,    30,    S_ITEMAMMO,   "SG", HICON_SG, GUN_SG},
-    {20,    60,    S_ITEMAMMO,   "CG", HICON_CG, GUN_CG},
-    {5,     15,    S_ITEMAMMO,   "RL", HICON_RL, GUN_RL},
+    {40,    120,   S_ITEMAMMO,   "CG", HICON_CG, GUN_CG},
+    {5,     30,    S_ITEMAMMO,   "RL", HICON_RL, GUN_RL},
     {5,     15,    S_ITEMAMMO,   "RI", HICON_RIFLE, GUN_RIFLE},
     {10,    30,    S_ITEMAMMO,   "GL", HICON_GL, GUN_GL},
     {30,    120,   S_ITEMAMMO,   "PI", HICON_PISTOL, GUN_PISTOL},
     {25,    100,   S_ITEMHEALTH, "H", HICON_HEALTH},
     {10,    1000,  S_ITEMHEALTH, "MH", HICON_HEALTH},
-    {100,   100,   S_ITEMARMOUR, "GA", HICON_GREEN_ARMOUR, A_GREEN},
-    {200,   200,   S_ITEMARMOUR, "YA", HICON_YELLOW_ARMOUR, A_YELLOW},
+    {75,    150,   S_ITEMARMOUR, "GA", HICON_GREEN_ARMOUR, A_GREEN},
+    {150,   200,   S_ITEMARMOUR, "YA", HICON_YELLOW_ARMOUR, A_YELLOW},
     {20000, 30000, S_ITEMPUP,    "Q", HICON_QUAD},
 };
 
@@ -342,13 +342,13 @@ static struct itemstat { int add, max, sound; const char *name; int icon, info; 
 
 static const struct guninfo { short sound, attackdelay, damage, spread, projspeed, part, kickamount, range; const char *name, *file; } guns[NUMGUNS] =
 {
-    { S_PUNCH1,    250,  50, 0,   0,   0, 0,   14,  "fist",            "fist"  },
-    { S_SG,       1400,  10, 400, 0,   0, 20, 1024, "shotgun",         "shotg" },  // *SGRAYS
-    { S_CG,        100,  30, 100, 0,   0, 7, 1024,  "chaingun",        "chaing"},
-    { S_RLFIRE,    800, 120, 0,   80,  0, 10, 1024, "rocketlauncher",  "rocket"},
-    { S_RIFLE,    1500, 100, 0,   0,   0, 30, 2048, "rifle",           "rifle" },
-    { S_FLAUNCH,   500,  75, 0,   270, 0, 10, 1024, "grenadelauncher", "gl" },
-    { S_PISTOL,    500,  35, 50,  0,   0,  7, 1024, "pistol",          "pistol" },
+    { S_PUNCH1,    250,  50, 0,   0,   0, 0,  14,   "fist",            "fist"  },
+    { S_SG,        800,   4, 400, 0,   0, 0,  1024, "shotgun",         "shotg" },  // *SGRAYS
+    { S_CG,         75,  10, 20,  0,   0, 0,  1024, "chaingun",        "chaing"},
+    { S_RLFIRE,    800, 110, 0,   80,  0, 0,  1024, "rocketlauncher",  "rocket"},
+    { S_RIFLE,    1500,  90, 0,   0,   0, 15, 2048, "rifle",           "rifle" },
+    { S_FLAUNCH,   700, 110, 0,   270, 0, 0,  1024, "grenadelauncher", "gl" },
+    { S_PISTOL,    500,  35, 20,  0,   0, 0,  1024, "pistol",          "pistol" },
     { S_FLAUNCH,   200,  20, 0,   50,  PART_FIREBALL1,  1, 1024, "fireball",  NULL },
     { S_ICEBALL,   200,  40, 0,   30,  PART_FIREBALL2,  1, 1024, "iceball",   NULL },
     { S_SLIMEBALL, 200,  30, 0,   160, PART_FIREBALL3,  1, 1024, "slimeball", NULL },
