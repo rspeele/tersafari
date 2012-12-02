@@ -1152,15 +1152,12 @@ void slideagainst(physent *d, vec &dir, const vec &obstacle, bool foundfloor, bo
 
 void switchfloor(physent *d, vec &dir, const vec &floor)
 {
-//    if(floor.z >= FLOORZ) d->falling = vec(0, 0, 0);
-
     vec oldvel(d->vel);
     if(dir.dot(floor) >= 0)
     {
         if(d->physstate < PHYS_SLIDE || fabs(dir.dot(d->floor)) > 0.01f*dir.magnitude()) return;
-        d->vel.projectxy(floor, 0.0f);
     }
-    else d->vel.projectxy(floor);
+    d->vel.project(floor);
     recalcdir(d, oldvel, dir);
 }
 
