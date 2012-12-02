@@ -251,6 +251,19 @@ namespace entities
         }
     }
 
+
+    // convert jumppad parameters to a velocity to impart
+    const float asqrtf(float x)
+    {
+        return (x < 0 ? -1 : 1) * sqrtf(abs(x));
+    }
+    const vec jumppadvel(int x, int y, int z)
+    {
+        const float zfac = 42.5f;
+        const float xyfac = 35.0f;
+        return vec(asqrtf((int)(char)x) * xyfac, asqrtf((int)(char)y) * xyfac, asqrtf(z) * zfac);
+    }
+
     void trypickup(int n, fpsent *d)
     {
         switch(ents[n]->type)
@@ -291,11 +304,12 @@ namespace entities
                 d->lastpickup = ents[n]->type;
                 d->lastpickupmillis = lastmillis;
                 jumppadeffects(d, n, true);
-                vec v((int)(char)ents[n]->attr3*10.0f, (int)(char)ents[n]->attr2*10.0f, ents[n]->attr1*12.5f);
+                vec v = jumppadvel(ents[n]->attr3, ents[n]->attr2, ents[n]->attr1);
                 if(d->ai) d->ai->becareful = true;
 				d->physstate = PHYS_FALL;
                 d->timeinair = 1;
-                d->vel = v;
+                d->vel.z = 0;
+                d->vel.add(v);
                 break;
             }
         }
