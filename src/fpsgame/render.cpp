@@ -263,7 +263,6 @@ namespace game
             float k = pow(0.7f, curtime/10.0f);
             swaydir.mul(k);
             vec vel(d->vel);
-            vel.add(d->falling);
             swaydir.add(vec(vel).mul((1-k)/(15*max(vel.magnitude(), d->maxspeed))));
         }
     }
