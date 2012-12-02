@@ -779,6 +779,7 @@ namespace game
         }
         else if((o = intersectclosest(from, to, d, dist)))
         {
+            if(d->gunselect == GUN_CG) qdam = server::cgdamage(d->o.dist(o->o)) * (d->quadmillis ? 4 : 1);
             shorten(from, to, dist);
             hitpush(qdam, o, d, from, to, d->gunselect, 1);
         }

@@ -2060,13 +2060,23 @@ namespace server
 
                     totalrays += h.rays;
                     if(totalrays>maxrays) continue;
-                    int damage = h.rays*guns[gun].damage;
+                    int damage = gun == GUN_CG ? cgdamage(target->state.o.dist(gs.o)) : h.rays*guns[gun].damage;
                     if(gs.quadmillis) damage *= 4;
                     dodamage(target, ci, damage, gun, h.dir);
                 }
                 break;
             }
         }
+    }
+
+    const int cgdamage(const float dist) // how much damage the CG should do at a given range
+    {
+        const int min = 5; // minimum damage possible
+        const int max = guns[GUN_CG].damage; // maximum damage
+        const float minrange = 400.0f; // range at which minimum damage is reached
+        const float maxrange = 25.0f; // range up to which maximum damage is dealt
+        float m = (max - min)/(maxrange - minrange);
+        return clamp((int)(m * (dist - minrange) + min), min, max);
     }
 
     void pickupevent::process(clientinfo *ci)

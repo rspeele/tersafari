@@ -803,6 +803,7 @@ namespace server
     extern int msgsizelookup(int msg);
     extern bool serveroption(const char *arg);
     extern bool delayspawn(int type);
+    extern const int cgdamage(const float dist);
 }
 
 #endif
