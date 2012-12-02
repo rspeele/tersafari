@@ -1009,8 +1009,10 @@ FVARP(zoomsens, 1e-3f, 1, 1000);
 FVARP(zoomaccel, 0, 0, 1000);
 VARP(zoomautosens, 0, 1, 1);
 FVARP(sensitivity, 1e-3f, 3, 1000);
-FVARP(sensitivityscale, 1e-3f, 1, 1000);
-VARP(invmouse, 0, 0, 1);
+FVARP(mouse_yaw, -1.0f, 0.022f, 1.0f);
+FVARP(mouse_pitch, -1.0f, 0.022f, 1.0f);
+// FVARP(sensitivityscale, 1e-3f, 1, 1000);
+// VARP(invmouse, 0, 0, 1);
 FVARP(mouseaccel, 0, 0, 1000);
  
 VAR(thirdperson, 0, 0, 2);
@@ -1047,9 +1049,9 @@ void mousemove(int dx, int dy)
         }
     }
     if(curaccel && curtime && (dx || dy)) cursens += curaccel * sqrtf(dx*dx + dy*dy)/curtime;
-    cursens /= 33.0f*sensitivityscale;
-    camera1->yaw += dx*cursens;
-    camera1->pitch -= dy*cursens*(invmouse ? -1 : 1);
+    // cursens /= 33.0f*sensitivityscale;
+    camera1->yaw += dx*cursens*mouse_yaw;
+    camera1->pitch -= dy*cursens*mouse_pitch;
     fixcamerarange();
     if(camera1!=player && !detachedcamera)
     {
