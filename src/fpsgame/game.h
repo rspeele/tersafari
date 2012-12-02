@@ -335,7 +335,7 @@ static struct itemstat { int add, max, sound; const char *name; int icon, info; 
     {20000, 30000, S_ITEMPUP,    "Q", HICON_QUAD},
 };
 
-#define SGRAYS 20
+#define SGRAYS 25
 #define RL_DAMRAD 40
 #define RL_SELFDAMDIV 2
 #define RL_DISTSCALE 1.5f
@@ -343,7 +343,7 @@ static struct itemstat { int add, max, sound; const char *name; int icon, info; 
 static const struct guninfo { short sound, attackdelay, damage, spread, projspeed, part, kickamount, range; const char *name, *file; } guns[NUMGUNS] =
 {
     { S_PUNCH1,    250,  50, 0,   0,   0, 0,  14,   "fist",            "fist"  },
-    { S_SG,        800,   4, 400, 0,   0, 0,  1024, "shotgun",         "shotg" },  // *SGRAYS
+    { S_SG,        800,   4, 80,  0,   0, 0,  1024, "shotgun",         "shotg" },  // *SGRAYS
     { S_CG,         75,  10, 20,  0,   0, 0,  1024, "chaingun",        "chaing"},
     { S_RLFIRE,    800, 110, 0,   80,  0, 0,  1024, "rocketlauncher",  "rocket"},
     { S_RIFLE,    1500,  90, 0,   0,   0, 15, 2048, "rifle",           "rifle" },

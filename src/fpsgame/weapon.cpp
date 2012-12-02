@@ -115,21 +115,65 @@ namespace game
         playsound(S_NOAMMO);
     });
 
+    void fixedoffset(const vec &from, const vec &to, const vec &offset, float endrange, vec &dest)
+    {
+        dest = to;
+        dest.add(vec(offset).mul(to.dist(from)/1024.0f));
+        vec dir(dest);
+        dir.sub(from);
+        dir.normalize();
+        raycubepos(from, dir, dest, endrange, RAY_CLIPMAT|RAY_ALPHAPOLY);
+    }
+
+    // offset randomly within a given spread
     void offsetray(const vec &from, const vec &to, int spread, float range, vec &dest)
     {
         vec offset;
         do offset = vec(rndscale(1), rndscale(1), rndscale(1)).sub(0.5f);
         while(offset.squaredlen() > 0.5f*0.5f);
-        offset.mul((to.dist(from)/1024)*spread);
-        dest = vec(offset).add(to);
-        vec dir = vec(dest).sub(from).normalize();
-        raycubepos(from, dir, dest, range, RAY_CLIPMAT|RAY_ALPHAPOLY);
+        offset.mul(spread);
+        fixedoffset(from, to, offset, range, dest);
     }
 
-    void createrays(const vec &from, const vec &to)             // create random spread of rays for the shotgun
+    // create fixed spread of rays for the shotgun
+    void createrays(const vec &from, const vec &to)
     {
-        loopi(SGRAYS) offsetray(from, to, guns[GUN_SG].spread, guns[GUN_SG].range, sg[i]);
+        const float ryaw = player1->yaw * RAD;
+        const float rpitch = player1->pitch * RAD;
+        static vec pattern[SGRAYS];
+        static bool empty = true;
+        if(empty) // generate shotgun pattern
+        {
+            const unsigned int arms = 6;
+            const float spin = 0.25f;
+            const float gap = guns[GUN_SG].spread / ((SGRAYS - 1) / arms);
+            vec cookie[arms]; // template of a single ring
+            loopi(arms) cookie[i] = vec(1.0f, 0.0f, 0.0f).rotate_around_y(PI * 2 * i / arms);
+            float radius = 0.0f, rotation = 0.0f;
+            pattern[0] = vec(0, 0, 0);
+            for(int i = 1; i < SGRAYS; i++)
+            {
+                if(!((i - 1) % arms)) { radius += gap; rotation += spin; }
+                pattern[i] = cookie[i % arms];
+                pattern[i].rotate_around_y(rotation);
+                pattern[i].mul(radius);
+            }
+            empty = false;
+        }
+        static vec offsets[SGRAYS];
+        loopi(SGRAYS)
+        {
+            offsets[i] = pattern[i];
+            offsets[i].rotate_around_x(rpitch);
+            offsets[i].rotate_around_z(ryaw);
+            fixedoffset(from, to, offsets[i], guns[GUN_SG].range, sg[i]);
+        }
     }
+
+    // void createrays(const vec &from, const vec &to)             // create random spread of rays for the shotgun
+    // {
+    //     loopi(SGRAYS) offsetray(from, to, guns[GUN_SG].spread, guns[GUN_SG].range, sg[i]);
+    // }
 
     enum { BNC_GRENADE, BNC_GIBS, BNC_DEBRIS, BNC_BARRELDEBRIS };
 
