@@ -455,8 +455,8 @@ const float STAIRHEIGHT = 4.1f;
 const float FLOORZ = 0.867f;
 const float SLOPEZ = 0.5f;
 const float WALLZ = 0.2f;
-extern const float JUMPVEL = 125.0f;
-extern const float GRAVITY = 200.0f;
+extern const float JUMPVEL = 95.0f;
+extern const float GRAVITY = 280.0f;
 
 bool ellipserectcollide(physent *d, const vec &dir, const vec &o, const vec &center, float yaw, float xr, float yr, float hi, float lo)
 {
@@ -1653,6 +1653,72 @@ FVAR(straferoll, 0, 0.033f, 90);
 FVAR(faderoll, 0, 0.95f, 1);
 VAR(floatspeed, 1, 100, 10000);
 
+namespace Movement
+{
+// the parameters controlling movement behavior
+    struct moveattrs
+    {
+        float friction, acceleration, speed;
+        bool vertical;
+    };
+
+    const moveattrs ground =
+    { 0.005f,
+      0.01f,
+      1.0f,
+      false };
+    const moveattrs air =
+    { 0.0f,
+      0.01f,
+      0.09375f,
+      false };
+    const moveattrs water =
+    { 0.0075f,
+      0.01f,
+      0.75f,
+      true };
+    const moveattrs fly =
+    { 0.005f,
+      0.01f,
+      1.0f,
+      true };
+// determining which set of movement parameters to use for a given state
+    const moveattrs &statewise(const physent *pl, bool floating)
+    {
+        return floating ? fly :
+            (pl->inwater ? water :
+             (pl->physstate >= PHYS_SLOPE ? ground : air));
+    }
+// applying velocity changes
+    void accelfric(physent *pl, vec &wishdir, bool floating, int curtime)
+    {
+        const float stopspeed = 1.0f;
+        const float fricspeed = 25.0f;
+        const moveattrs &m = statewise(pl, floating);
+        if(m.friction > 0)
+        {
+            const float speed = pl->vel.magnitude();
+            if(speed < stopspeed) pl->vel.x = pl->vel.y = 0; // come to a complete stop once moving very slowly
+            else
+            {
+                // apply friction proportional to speed, but if the speed is less than fricspeed use that instead
+                const float drop = max(speed, fricspeed) * m.friction * curtime;
+                const float newspeed = max(0.0f, speed - drop);
+                pl->vel.mul(newspeed / speed); // rescale
+            }
+        }
+        const float wish = pl->maxspeed; // scale maxspeed according to moveattrs
+        const float current = m.vertical ? pl->vel.dot(wishdir) : pl->vel.dot2(wishdir);
+        const float add = wish * m.speed - current;
+        if(add > 0)
+        {
+            const float accel = min(add, m.acceleration * curtime * wish);
+            pl->vel.add(wishdir.mul(accel));
+        }
+    }
+}
+
+
 void modifyvelocity(physent *pl, bool local, bool water, bool floating, int curtime)
 {
     if(floating)
@@ -1694,23 +1760,23 @@ void modifyvelocity(physent *pl, bool local, bool water, bool floating, int curt
 
         m.normalize();
     }
-
-    vec d(m);
-    d.mul(pl->maxspeed);
-    if(pl->type==ENT_PLAYER)
-    {
-        if(floating)
-        {
-            if(pl==player) d.mul(floatspeed/100.0f);
-        }
-        else if(!water && game::allowmove(pl)) d.mul((pl->move && !pl->strafe ? 1.3f : 1.0f) * (pl->physstate < PHYS_SLOPE ? 1.3f : 1.0f));
-    }
-    float fric = water && !floating ? 20.0f : (pl->physstate >= PHYS_SLOPE || floating ? 6.0f : 30.0f);
-    pl->vel.lerp(d, pl->vel, pow(1 - 1/fric, curtime/20.0f));
-// old fps friction
-//    float friction = water && !floating ? 20.0f : (pl->physstate >= PHYS_SLOPE || floating ? 6.0f : 30.0f);
-//    float fpsfric = min(curtime/(20.0f*friction), 1.0f);
-//    pl->vel.lerp(pl->vel, d, fpsfric);
+    Movement::accelfric(pl, m, floating, curtime);
+//     vec d(m);
+//     d.mul(pl->maxspeed);
+//     if(pl->type==ENT_PLAYER)
+//     {
+//         if(floating)
+//         {
+//             if(pl==player) d.mul(floatspeed/100.0f);
+//         }
+//         else if(!water && game::allowmove(pl)) d.mul((pl->move && !pl->strafe ? 1.3f : 1.0f) * (pl->physstate < PHYS_SLOPE ? 1.3f : 1.0f));
+//     }
+//     float fric = water && !floating ? 20.0f : (pl->physstate >= PHYS_SLOPE || floating ? 6.0f : 30.0f);
+//     pl->vel.lerp(d, pl->vel, pow(1 - 1/fric, curtime/20.0f));
+// // old fps friction
+// //    float friction = water && !floating ? 20.0f : (pl->physstate >= PHYS_SLOPE || floating ? 6.0f : 30.0f);
+// //    float fpsfric = min(curtime/(20.0f*friction), 1.0f);
+// //    pl->vel.lerp(pl->vel, d, fpsfric);
 }
 
 void modifygravity(physent *pl, bool water, int curtime)
