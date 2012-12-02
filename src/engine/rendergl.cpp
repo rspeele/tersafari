@@ -2165,7 +2165,7 @@ void drawdamagescreen(int w, int h)
 VAR(hidestats, 0, 0, 1);
 VAR(hidehud, 0, 0, 1);
 
-VARP(crosshairsize, 0, 15, 50);
+VARP(crosshairsize, -1, 15, 50);
 VARP(cursorsize, 0, 30, 50);
 VARP(crosshairfx, 0, 1, 1);
 VARP(crosshaircolors, 0, 1, 1);
@@ -2237,7 +2237,7 @@ void drawcrosshair(int w, int h)
             loadcrosshair(NULL, index);
             crosshair = crosshairs[index];
         }
-        chsize = crosshairsize*w/900.0f;
+        chsize = crosshairsize < 0 ? max(crosshair->w, crosshair->h) : crosshairsize*w/900.0f;
     }
     if(crosshair->type&Texture::ALPHA) glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     else glBlendFunc(GL_ONE, GL_ONE);
