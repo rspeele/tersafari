@@ -1142,6 +1142,22 @@ void recalcdir(physent *d, const vec &oldvel, vec &dir)
     }
 }
 
+void walljump(physent *d, vec &dir, const vec &wall)
+{
+    vec oldvel(d->vel);
+    d->vel.z = 0;
+    d->vel.reflect(wall);
+    float speed = d->vel.magnitude2();
+    if (speed < d->maxspeed)
+    {
+        d->vel.mul(d->maxspeed / speed);
+    }
+    d->vel.z = JUMPVEL;
+    recalcdir(d, oldvel, dir);
+    d->jumping = false;
+    game::physicstrigger(d, true, 1, 0);
+}
+
 void slideagainst(physent *d, vec &dir, const vec &obstacle, bool foundfloor, bool slidecollide)
 {
     vec wall(obstacle);
@@ -1150,9 +1166,16 @@ void slideagainst(physent *d, vec &dir, const vec &obstacle, bool foundfloor, bo
         wall.z = 0;
         if(!wall.iszero()) wall.normalize();
     }
-    vec oldvel(d->vel);
-    d->vel.project(wall);
-    recalcdir(d, oldvel, dir);
+    if (d->jumping && d->vel.dot2(wall) < -pl->maxspeed/10.0f)
+    {
+        walljump(d, dir, wall);
+    }
+    else
+    {
+        vec oldvel(d->vel);
+        d->vel.project(wall);
+        recalcdir(d, oldvel, dir);
+    }
 }
 
 void switchfloor(physent *d, vec &dir, const vec &floor)
