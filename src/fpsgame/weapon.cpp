@@ -621,7 +621,7 @@ namespace game
                 loopi(SGRAYS)
                 {
                     particle_splash(PART_SPARK, 20, 250, sg[i], 0xB49B4B, 0.24f);
-                    particle_flare(hudgunorigin(gun, from, sg[i], d), sg[i], 300, PART_STREAK, 0xFFC864, 0.28f);
+                    particle_flare(hudgunorigin(gun, from, sg[i], d), sg[i], 50, PART_STREAK, 0xFFC864, 0.28f);
                     if(!local) adddecal(DECAL_BULLET, sg[i], vec(from).sub(sg[i]).normalize(), 2.0f);
                 }
                 if(muzzlelight) adddynlight(hudgunorigin(gun, d->o, to, d), 30, vec(1.0f, 0.75f, 0.5f), 100, 100, DL_FLASH, 0, vec(0, 0, 0), d);
@@ -632,7 +632,7 @@ namespace game
             case GUN_PISTOL:
             {
                 particle_splash(PART_SPARK, 200, 250, to, 0xB49B4B, 0.24f);
-                particle_flare(hudgunorigin(gun, from, to, d), to, 600, PART_STREAK, 0xFFC864, 0.28f);
+                particle_flare(hudgunorigin(gun, from, to, d), to, 100, PART_STREAK, 0xFFC864, 0.28f);
                 if(muzzleflash && d->muzzle.x >= 0)
                     particle_flare(d->muzzle, d->muzzle, gun==GUN_CG ? 100 : 200, PART_MUZZLE_FLASH1, 0xFFFFFF, gun==GUN_CG ? 2.25f : 1.25f, d);
                 if(!local) adddecal(DECAL_BULLET, to, vec(from).sub(to).normalize(), 2.0f);
@@ -853,7 +853,7 @@ namespace game
             if(p.gun!=GUN_RL) continue;
             vec pos(p.o);
             pos.add(vec(p.offset).mul(p.offsetmillis/float(OFFSETMILLIS)));
-            adddynlight(pos, RL_DAMRAD/2, vec(1, 0.75f, 0.5f));
+            adddynlight(pos, RL_DAMRAD, vec(1, 0.75f, 0.5f));
         }
         loopv(bouncers)
         {
@@ -931,6 +931,7 @@ namespace game
             v.mul(3);
             v.add(pos);
             rendermodel("projectiles/rocket", ANIM_MAPMODEL|ANIM_LOOP, v, yaw, pitch, MDL_CULL_VFC|MDL_CULL_OCCLUDED);
+            particle_fireball(pos, 1.5f, PART_EXPLOSION, 15, 0xFF8080, 1.0f);
         }
     }
 
