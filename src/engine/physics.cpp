@@ -1166,7 +1166,7 @@ void slideagainst(physent *d, vec &dir, const vec &obstacle, bool foundfloor, bo
         wall.z = 0;
         if(!wall.iszero()) wall.normalize();
     }
-    if (d->jumping && d->vel.dot2(wall) < -pl->maxspeed/10.0f)
+    if (d->jumping && d->vel.dot2(wall) < -d->maxspeed/10.0f)
     {
         walljump(d, dir, wall);
     }
