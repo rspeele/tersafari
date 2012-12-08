@@ -2,7 +2,7 @@
 
 #include "engine.h"
 
-bool hasVBO = false, hasDRE = false, hasOQ = false, hasTR = false, hasT3D = false, hasFBO = false, hasAFBO = false, hasDS = false, hasTF = false, hasCBF = false, hasBE = false, hasBC = false, hasCM = false, hasNP2 = false, hasTC = false, hasS3TC = false, hasFXT1 = false, hasMT = false, hasAF = false, hasMDA = false, hasGLSL = false, hasGM = false, hasNVFB = false, hasSGIDT = false, hasSGISH = false, hasDT = false, hasSH = false, hasNVPCF = false, hasPBO = false, hasFBB = false, hasUBO = false, hasBUE = false, hasMBR = false, hasDB = false, hasTG = false, hasT4 = false, hasTQ = false, hasPF = false, hasTRG = false, hasDBT = false, hasDC = false, hasDBGO = false;
+bool hasVBO = false, hasDRE = false, hasOQ = false, hasTR = false, hasT3D = false, hasFBO = false, hasAFBO = false, hasDS = false, hasTF = false, hasCBF = false, hasBE = false, hasBC = false, hasCM = false, hasNP2 = false, hasTC = false, hasS3TC = false, hasFXT1 = false, hasMT = false, hasAF = false, hasMDA = false, hasGLSL = false, hasGM = false, hasNVFB = false, hasSGIDT = false, hasSGISH = false, hasDT = false, hasSH = false, hasNVPCF = false, hasPBO = false, hasFBB = false, hasUBO = false, hasBUE = false, hasMBR = false, hasDB = false, hasTG = false, hasT4 = false, hasTQ = false, hasPF = false, hasTRG = false, hasDBT = false, hasDC = false, hasDBGO = false, hasGPU4 = false, hasGPU5 = false;
 bool mesa = false, intel = false, ati = false, nvidia = false;
 
 int hasstencil = 0;
@@ -441,7 +441,7 @@ void gl_checkextensions()
         hasTQ = true;
     }
 
-    extern int gdepthstencil, glineardepth, lighttilebatch, batchsunlight, lighttilestrip;
+    extern int gdepthstencil, glineardepth, lighttilebatch, batchsunlight, lighttilestrip, smgather;
     if(ati)
     {
         //conoutf(CON_WARN, "WARNING: ATI cards may show garbage in skybox. (use \"/ati_skybox_bug 1\" to fix)");
@@ -460,6 +460,7 @@ void gl_checkextensions()
         glineardepth = 1; // causes massive slowdown in windows driver (and sometimes in linux driver) if not using linear depth
         lighttilebatch = 4;
         if(mesa) batchsunlight = 0; // causes massive slowdown in linux driver
+        smgather = 1; // native shadow filter is slow
     }
 
     if(glversion >= 200)
@@ -709,6 +710,18 @@ void gl_checkextensions()
         if(dbgexts) conoutf(CON_INIT, "Using GL_AMD_texture_texture4 extension.");
     }
     if(hasTG || hasT4) usetexgather = 1;
+
+    if(hasext(exts, "GL_EXT_gpu_shader4"))
+    {
+        hasGPU4 = true;
+        if(dbgexts) conoutf(CON_INIT, "Using GL_EXT_gpu_shader4 extension.");
+    }
+    if(hasext(exts, "GL_ARB_gpu_shader5"))
+    {
+        if(!intel) usetexgather = 2;
+        hasGPU5 = true;
+        if(dbgexts) conoutf(CON_INIT, "Using GL_ARB_gpu_shader5 extension.");
+    }
 
     if(hasext(exts, "GL_EXT_depth_bounds_test"))
     {
@@ -1512,6 +1525,7 @@ VAR(fogoverlay, 0, 1, 1);
 
 static float findsurface(int fogmat, const vec &v, int &abovemat)
 {
+    fogmat &= MATF_VOLUME;
     ivec o(v), co;
     int csize;
     do
@@ -1520,7 +1534,7 @@ static float findsurface(int fogmat, const vec &v, int &abovemat)
         int mat = c.material&MATF_VOLUME;
         if(mat != fogmat)
         {
-            abovemat = isliquid(mat) ? mat : MAT_AIR;
+            abovemat = isliquid(mat) ? c.material : MAT_AIR;
             return o.z;
         }
         o.z = co.z + csize;
@@ -1532,22 +1546,28 @@ static float findsurface(int fogmat, const vec &v, int &abovemat)
 
 static void blendfog(int fogmat, float below, float blend, float logblend, float &start, float &end, vec &fogc)
 {
-    switch(fogmat)
+    switch(fogmat&MATF_VOLUME)
     {
         case MAT_WATER:
         {
-            float deepfade = clamp(below/max(waterdeep, waterfog), 0.0f, 1.0f);
+            const bvec &wcol = getwatercolor(fogmat), &wdeepcol = getwaterdeepcolor(fogmat);
+            int wfog = getwaterfog(fogmat), wdeep = getwaterdeep(fogmat);
+            float deepfade = clamp(below/max(wdeep, wfog), 0.0f, 1.0f);
             vec color;
-            color.lerp(watercolor.tocolor(), waterdeepcolor.tocolor(), deepfade);
+            color.lerp(wcol.tocolor(), wdeepcol.tocolor(), deepfade);
             fogc.add(vec(color).mul(blend));
-            end += logblend*min(fog, max(waterfog*2, 16));
+            end += logblend*min(fog, max(wfog*2, 16));
             break;
         }
 
         case MAT_LAVA:
-            fogc.add(lavacolor.tocolor().mul(blend));
-            end += logblend*min(fog, max(lavafog*2, 16));
+        {
+            const bvec &lcol = getlavacolor(fogmat);
+            int lfog = getlavafog(fogmat);
+            fogc.add(lcol.tocolor().mul(blend));
+            end += logblend*min(fog, max(lfog*2, 16));
             break;
+        }
 
         default:
             fogc.add(fogcolor.tocolor().mul(blend));
@@ -1593,22 +1613,27 @@ static void setfog(int fogmat, float below = 0, float blend = 1, int abovemat = 
 static void blendfogoverlay(int fogmat, float below, float blend, float *overlay)
 {
     float maxc;
-    switch(fogmat)
+    switch(fogmat&MATF_VOLUME)
     {
         case MAT_WATER:
         {
-            float deepfade = clamp(below/max(waterdeep, waterfog), 0.0f, 1.0f);
+            const bvec &wcol = getwatercolor(fogmat), &wdeepcol = getwaterdeepcolor(fogmat);
+            int wfog = getwaterfog(fogmat), wdeep = getwaterdeep(fogmat);
+            float deepfade = clamp(below/max(wdeep, wfog), 0.0f, 1.0f);
             vec color;
-            loopk(3) color[k] = watercolor[k]*(1-deepfade) + waterdeepcolor[k]*deepfade;
+            loopk(3) color[k] = wcol[k]*(1-deepfade) + wdeepcol[k]*deepfade;
             maxc = max(color[0], max(color[1], color[2]));
             loopk(3) overlay[k] += blend*max(0.4f, color[k]/min(32.0f + maxc*7.0f/8.0f, 255.0f));
             break;
         }
 
         case MAT_LAVA:
-            maxc = max(lavacolor[0], max(lavacolor[1], lavacolor[2]));
-            loopk(3) overlay[k] += blend*max(0.4f, lavacolor[k]/min(32.0f + maxc*7.0f/8.0f, 255.0f));
+        {
+            const bvec &lcol = getlavacolor(fogmat);
+            maxc = max(lcol[0], max(lcol[1], lcol[2]));
+            loopk(3) overlay[k] += blend*max(0.4f, lcol[k]/min(32.0f + maxc*7.0f/8.0f, 255.0f));
             break;
+        }
 
         default:
             loopk(3) overlay[k] += blend;
@@ -1837,9 +1862,9 @@ void drawcubemap(int size, const vec &o, float yaw, float pitch, const cubemapsi
     setviewcell(camera1->o);
 
     float fogmargin = 1 + WATER_AMPLITUDE + nearplane;
-    int fogmat = lookupmaterial(vec(camera1->o.x, camera1->o.y, camera1->o.z - fogmargin))&MATF_VOLUME, abovemat = MAT_AIR;
+    int fogmat = lookupmaterial(vec(camera1->o.x, camera1->o.y, camera1->o.z - fogmargin))&(MATF_VOLUME|MATF_INDEX), abovemat = MAT_AIR;
     float fogbelow = 0;
-    if(fogmat==MAT_WATER || fogmat==MAT_LAVA)
+    if(isliquid(fogmat&MATF_VOLUME))
     {
         float z = findsurface(fogmat, vec(camera1->o.x, camera1->o.y, camera1->o.z - fogmargin), abovemat) - WATER_OFFSET;
         if(camera1->o.z < z + fogmargin)
@@ -1934,9 +1959,9 @@ void gl_drawframe(int w, int h)
     fovy = 2*atan2(tan(curfov/2*RAD), aspect)/RAD;
     
     float fogmargin = 1 + WATER_AMPLITUDE + nearplane;
-    int fogmat = lookupmaterial(vec(camera1->o.x, camera1->o.y, camera1->o.z - fogmargin))&MATF_VOLUME, abovemat = MAT_AIR;
+    int fogmat = lookupmaterial(vec(camera1->o.x, camera1->o.y, camera1->o.z - fogmargin))&(MATF_VOLUME|MATF_INDEX), abovemat = MAT_AIR;
     float fogbelow = 0;
-    if(fogmat==MAT_WATER || fogmat==MAT_LAVA)
+    if(isliquid(fogmat&MATF_VOLUME))
     {
         float z = findsurface(fogmat, vec(camera1->o.x, camera1->o.y, camera1->o.z - fogmargin), abovemat) - WATER_OFFSET;
         if(camera1->o.z < z + fogmargin)
@@ -2376,7 +2401,7 @@ void gl_drawhud(int w, int h)
             if(editmode)
             {
                 abovehud -= FONTH;
-                draw_textf("cube %s%d", FONTH/2, abovehud, selchildcount<0 ? "1/" : "", abs(selchildcount));
+                draw_textf("cube %s%d%s", FONTH/2, abovehud, selchildcount<0 ? "1/" : "", abs(selchildcount), showmat && selchildmat > 0 ? getmaterialdesc(selchildmat, ": ") : "");
 
                 char *editinfo = executestr("edithud");
                 if(editinfo)

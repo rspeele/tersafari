@@ -1016,6 +1016,7 @@ static inline void setsmcomparemode() // use embedded shadow cmp
 }
 
 static inline bool usegatherforsm() { return smfilter > 1 && smgather && (hasTG || hasT4); }
+static inline bool usesmcomparemode() { return !usegatherforsm() || (hasTG && hasGPU5); }
 
 void viewshadowatlas()
 {
@@ -1030,14 +1031,14 @@ void viewshadowatlas()
     else defaultshader->set();
     glColor3f(1, 1, 1);
     glBindTexture(shadowatlastarget, shadowatlastex);
-    if(!usegatherforsm()) setsmnoncomparemode(); // "normal" mode
+    if(usesmcomparemode()) setsmnoncomparemode();
     glBegin(GL_TRIANGLE_STRIP);
     glTexCoord2f(0, 0); glVertex2i(screen->w-w, screen->h-h);
     glTexCoord2f(tw, 0); glVertex2i(screen->w, screen->h-h);
     glTexCoord2f(0, th); glVertex2i(screen->w-w, screen->h);
     glTexCoord2f(tw, th); glVertex2i(screen->w, screen->h);
     glEnd();
-    if(!usegatherforsm()) setsmcomparemode(); // "gather" mode basically
+    if(usesmcomparemode()) setsmcomparemode();
     notextureshader->set();
 }
 VAR(debugshadowatlas, 0, 0, 1);
@@ -1146,6 +1147,9 @@ const float tetrashadowviewmatrix[4][16] =
 FVAR(smpolyfactor, -1e3f, 1, 1e3f);
 FVAR(smpolyoffset, -1e3f, 0, 1e3f);
 FVAR(smbias, -1e6f, 0.01f, 1e6f);
+FVAR(smpolyfactor2, -1e3f, 1.5f, 1e3f);
+FVAR(smpolyoffset2, -1e3f, 0, 1e3f);
+FVAR(smbias2, -1e6f, 0.02f, 1e6f);
 FVAR(smprec, 1e-3f, 1, 1e3f);
 FVAR(smtetraprec, 1e-3f, SQRT3, 1e3f);
 FVAR(smcubeprec, 1e-3f, 1, 1e3f);
@@ -1154,6 +1158,7 @@ FVAR(smspotprec, 1e-3f, 1, 1e3f);
 VAR(smsidecull, 0, 1, 1);
 VAR(smviscull, 0, 1, 1);
 VAR(smborder, 0, 3, 16);
+VAR(smborder2, 0, 4, 16);
 VAR(smminradius, 0, 16, 10000);
 VAR(smminsize, 1, 96, 1024);
 VAR(smmaxsize, 1, 384, 1024);
@@ -1166,9 +1171,10 @@ VAR(smtetraclear, 0, 1, 1);
 FVAR(smtetraborder, 0, 0, 1e3f);
 VARF(smcullside, 0, 1, 1, cleanupshadowatlas());
 VARF(smcache, 0, 1, 2, cleanupshadowatlas());
-VARFP(smfilter, 0, 2, 2, { cleardeferredlightshaders(); cleanupshadowatlas(); });
+VARFP(smfilter, 0, 2, 3, { cleardeferredlightshaders(); cleanupshadowatlas(); });
 VARFP(smgather, 0, 0, 1, { cleardeferredlightshaders(); cleanupshadowatlas(); });
-VAR(smnoshadow, 0, 0, 2);
+VAR(smnoshadow, 0, 0, 1);
+VAR(smnodynshadow, 0, 0, 1);
 VAR(lighttilesused, 1, 0, 0);
 
 int shadowmapping = 0;
@@ -1253,6 +1259,9 @@ FVAR(csmdepthmargin, 0, 0.1f, 1e3f);
 FVAR(csmpolyfactor, -1e3f, 2, 1e3f);
 FVAR(csmpolyoffset, -1e4f, 0, 1e4f);
 FVAR(csmbias, -1e6f, 1e-4f, 1e6f);
+FVAR(csmpolyfactor2, -1e3f, 3, 1e3f);
+FVAR(csmpolyoffset2, -1e4f, 0, 1e4f);
+FVAR(csmbias2, -1e16f, 2e-4f, 1e6f);
 VAR(csmcull, 0, 1, 1);
 
 void cascadedshadowmap::updatesplitdist()
@@ -1301,7 +1310,8 @@ void cascadedshadowmap::getprojmatrix()
         // compute the projected bounding box of the sphere
         vec tc;
         this->model.transform(c, tc);
-        const float pradius = ceil(radius * csmpradiustweak), step = (2*pradius) / (sm.size - 2*smborder);
+        int border = smfilter > 2 ? smborder2 : smborder;
+        const float pradius = ceil(radius * csmpradiustweak), step = (2*pradius) / (sm.size - 2*border);
         vec2 offset = vec2(tc).sub(pradius).div(step);
         offset.x = floor(offset.x);
         offset.y = floor(offset.y);
@@ -1311,13 +1321,13 @@ void cascadedshadowmap::getprojmatrix()
         // modify mvp with a scale and offset
         // now compute the update model view matrix for this split
         split.scale = vec(1/step, 1/step, -1/(maxz - minz));
-        split.offset = vec(smborder - offset.x, smborder - offset.y, -minz/(maxz - minz));
+        split.offset = vec(border - offset.x, border - offset.y, -minz/(maxz - minz));
 
         split.proj.identity();
         split.proj.scale(2*split.scale.x/sm.size, 2*split.scale.y/sm.size, 2*split.scale.z);
         split.proj.translate(2*split.offset.x/sm.size - 1, 2*split.offset.y/sm.size - 1, 2*split.offset.z - 1);
 
-        const float bias = csmbias * (-512.0f / sm.size) * (split.farplane - split.nearplane) / (splits[0].farplane - splits[0].nearplane);
+        const float bias = (smfilter > 2 ? csmbias2 : csmbias) * (-512.0f / sm.size) * (split.farplane - split.nearplane) / (splits[0].farplane - splits[0].nearplane);
         split.offset.add(vec(sm.x, sm.y, bias));
     }
 }
@@ -1639,8 +1649,8 @@ Shader *loaddeferredlightshader(const char *type = NULL)
         copystring(common, type);
         commonlen = strlen(common);
     }
-    if(usegatherforsm()) common[commonlen++] = 'g';
-    else if(smfilter) common[commonlen++] = smfilter > 1 ? 'F' : 'f';
+    if(usegatherforsm()) common[commonlen++] = smfilter > 2 ? 'G' : 'g';
+    else if(smfilter) common[commonlen++] = smfilter > 2 ? 'E' : (smfilter > 1 ? 'F' : 'f');
     common[commonlen] = '\0';
 
     shadow[shadowlen++] = 'p';
@@ -1857,7 +1867,7 @@ void renderlights(int infer = 0, float bsx1 = -1, float bsy1 = -1, float bsx2 = 
     glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gdepthtex);
     glActiveTexture_(GL_TEXTURE4_ARB);
     glBindTexture(shadowatlastarget, shadowatlastex);
-    if(usegatherforsm()) setsmnoncomparemode(); else setsmcomparemode();
+    if(usesmcomparemode()) setsmcomparemode(); else setsmnoncomparemode();
     if(ao)
     {
         glActiveTexture_(GL_TEXTURE5_ARB);
@@ -2027,7 +2037,8 @@ void renderlights(int infer = 0, float bsx1 = -1, float bsy1 = -1, float bsx2 = 
             {
                 shadowmapinfo &sm = shadowmaps[l.shadowmap];
                 float smnearclip = SQRT3 / l.radius, smfarclip = SQRT3,
-                      bias = (smcullside ? smbias : -smbias) * smnearclip * (1024.0f / sm.size);
+                      bias = (smfilter > 2 ? smbias2 : smbias) * (smcullside ? 1 : -1) * smnearclip * (1024.0f / sm.size);
+                int border = smfilter > 2 ? smborder2 : smborder;
                 if(spotlight)
                 {
                     spotxv[0] = l.spotx;
@@ -2042,7 +2053,7 @@ void renderlights(int infer = 0, float bsx1 = -1, float bsy1 = -1, float bsx2 = 
                 else
                 {
                     shadowparamsv[0] = vec4(
-                        0.5f * (sm.size - smborder),
+                        0.5f * (sm.size - border),
                         -smnearclip * smfarclip / (smfarclip - smnearclip) - 0.5f*bias,
                         sm.size,
                         0.5f + 0.5f * (smfarclip + smnearclip) / (smfarclip - smnearclip));
@@ -2171,7 +2182,8 @@ void renderlights(int infer = 0, float bsx1 = -1, float bsy1 = -1, float bsx2 = 
                     {
                         shadowmapinfo &sm = shadowmaps[l.shadowmap];
                         float smnearclip = SQRT3 / l.radius, smfarclip = SQRT3,
-                              bias = (smcullside ? smbias : -smbias) * smnearclip * (1024.0f / sm.size);
+                              bias = (smfilter > 2 ? smbias2 : smbias) * (smcullside ? 1 : -1) * smnearclip * (1024.0f / sm.size);
+                        int border = smfilter > 2 ? smborder2 : smborder;
                         if(spotlight)
                         {
                             spotxv[j] = l.spotx;
@@ -2186,7 +2198,7 @@ void renderlights(int infer = 0, float bsx1 = -1, float bsy1 = -1, float bsx2 = 
                         else
                         {
                             shadowparamsv[j] = vec4(
-                                0.5f * (sm.size - smborder),
+                                0.5f * (sm.size - border),
                                 -smnearclip * smfarclip / (smfarclip - smnearclip) - 0.5f*bias,
                                 sm.size,
                                 0.5f + 0.5f * (smfarclip + smnearclip) / (smfarclip - smnearclip));
@@ -2465,7 +2477,7 @@ void packlights()
     smused = 0;
 
     bool tetra = smtetra && glslversion >= 130;
-    if(smcache && smnoshadow <= 1 && shadowcache.numelems) loopv(lightorder)
+    if(smcache && !smnoshadow && shadowcache.numelems) loopv(lightorder)
     {
         int idx = lightorder[i];
         lightinfo &l = lights[idx];
@@ -2503,7 +2515,7 @@ void packlights()
         lightinfo &l = lights[idx];
         if(l.shadowmap >= 0) continue;
 
-        if(!(l.flags&L_NOSHADOW) && smnoshadow <= 1 && l.radius > smminradius)
+        if(!(l.flags&L_NOSHADOW) && !smnoshadow && l.radius > smminradius)
         {
             if(l.query && l.query->owner == &l && checkquery(l.query)) { lightsoccluded++; continue; }
             float prec = smprec, smlod;
@@ -2875,9 +2887,11 @@ void rendercsmshadowmaps()
     shadowbias = csm.lightview.project_bb(worldmin, worldmax);
     shadowradius = fabs(csm.lightview.project_bb(worldmax, worldmin));
 
-    if(csmpolyfactor || csmpolyoffset)
+    float polyfactor = csmpolyfactor, polyoffset = csmpolyoffset;
+    if(smfilter > 2) { polyfactor = csmpolyfactor2; polyoffset = csmpolyoffset2; } 
+    if(polyfactor || polyoffset)
     {
-        glPolygonOffset(csmpolyfactor, csmpolyoffset);
+        glPolygonOffset(polyfactor, polyoffset);
         glEnable(GL_POLYGON_OFFSET_FILL);
     }
 
@@ -2907,7 +2921,7 @@ void rendercsmshadowmaps()
 
     clearbatchedmapmodels();
 
-    if(csmpolyfactor || csmpolyoffset) glDisable(GL_POLYGON_OFFSET_FILL);
+    if(polyfactor || polyoffset) glDisable(GL_POLYGON_OFFSET_FILL);
 
     shadowmapping = 0;
 }
@@ -2915,9 +2929,11 @@ void rendercsmshadowmaps()
 void rendershadowmaps()
 {
     bool tetra = smtetra && glslversion >= 130;
-    if(smpolyfactor || smpolyoffset)
+    float polyfactor = smpolyfactor, polyoffset = smpolyoffset;
+    if(smfilter > 2) { polyfactor = smpolyfactor2; polyoffset = smpolyoffset2; }
+    if(polyfactor || polyoffset)
     {
-        glPolygonOffset(smpolyfactor, smpolyoffset);
+        glPolygonOffset(polyfactor, polyoffset);
         glEnable(GL_POLYGON_OFFSET_FILL);
     }
 
@@ -2940,14 +2956,14 @@ void rendershadowmaps()
         {
             if(shadowmapping != SM_TETRA && smtetraclip) glEnable(GL_CLIP_PLANE0);
             shadowmapping = SM_TETRA;
-            border = smborder;
-            sidemask = smsidecull ? cullfrustumtetra(l.o, l.radius, sm.size, smborder) : 0xF;
+            border = smfilter > 2 ? smborder2 : smborder;
+            sidemask = smsidecull ? cullfrustumtetra(l.o, l.radius, sm.size, border) : 0xF;
         }
         else
         {
             shadowmapping = SM_CUBEMAP;
-            border = smborder;
-            sidemask = smsidecull ? cullfrustumsides(l.o, l.radius, sm.size, smborder) : 0x3F;
+            border = smfilter > 2 ? smborder2 : smborder;
+            sidemask = smsidecull ? cullfrustumsides(l.o, l.radius, sm.size, border) : 0x3F;
         }
 
         sm.sidemask = sidemask;
@@ -2961,7 +2977,7 @@ void rendershadowmaps()
         findshadowvas();
         findshadowmms();
 
-        shadowmaskbatchedmodels(!(l.flags&L_NODYNSHADOW));
+        shadowmaskbatchedmodels(!(l.flags&L_NODYNSHADOW) && !smnodynshadow);
         batchshadowmapmodels();
 
         shadowcacheval *cached = NULL;
@@ -3124,7 +3140,7 @@ void rendershadowmaps()
     }
 
     if(shadowmapping == SM_TETRA && smtetraclip) glDisable(GL_CLIP_PLANE0);
-    if(smpolyfactor || smpolyoffset) glDisable(GL_POLYGON_OFFSET_FILL);
+    if(polyfactor || polyoffset) glDisable(GL_POLYGON_OFFSET_FILL);
 
     shadowmapping = 0;
 }
