@@ -773,6 +773,8 @@ namespace game
         glPopMatrix();
     }
 
+    VARP(showspeed, 0, 1, 1);
+
     void drawhudicons(fpsent *d)
     {
         glPushMatrix();
@@ -781,6 +783,7 @@ namespace game
         draw_textf("%d", (HICON_X + HICON_SIZE + HICON_SPACE)/2, HICON_TEXTY/2, d->state==CS_DEAD ? 0 : d->health);
         if(d->state!=CS_DEAD)
         {
+            if(showspeed) draw_textf("%d", (HICON_X + HICON_STEP * 3 + HICON_SIZE + HICON_SPACE)/2, HICON_TEXTY/2, (int)(d->vel.magnitude2()));
             if(d->armour) draw_textf("%d", (HICON_X + HICON_STEP + HICON_SIZE + HICON_SPACE)/2, HICON_TEXTY/2, d->armour);
             draw_textf("%d", (HICON_X + 2*HICON_STEP + HICON_SIZE + HICON_SPACE)/2, HICON_TEXTY/2, d->ammo[d->gunselect]);
         }
