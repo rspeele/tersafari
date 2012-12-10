@@ -1376,6 +1376,19 @@ void falling(physent *d, vec &dir, const vec &floor)
         d->physstate = PHYS_FALL;
 }
 
+// cut a fraction of the player's speed exceeding maxspeed when
+// hitting the ground
+void brakevel(physent *d)
+{
+    const float brake = 0.15f;
+    const float speed = d->vel.magnitude2();
+    const float over = speed - d->maxspeed;
+    if (over <= 0) return;
+    const float scale = (speed - over * brake) / speed;
+    d->vel.x *= scale;
+    d->vel.y *= scale;
+}
+
 void landing(physent *d, vec &dir, const vec &floor, bool collided)
 {
 #if 0
@@ -1385,11 +1398,13 @@ void landing(physent *d, vec &dir, const vec &floor, bool collided)
         if(dir.z < 0.0f) dir.z = d->vel.z = 0.0f;
     }
 #endif
+    const bool air = d->timeinair > 0;
     switchfloor(d, dir, floor);
     d->timeinair = 0;
     if((d->physstate!=PHYS_STEP_UP && d->physstate!=PHYS_STEP_DOWN) || !collided)
         d->physstate = floor.z >= FLOORZ ? PHYS_FLOOR : PHYS_SLOPE;
     d->floor = floor;
+    if(air) brakevel(d);
 }
 
 bool findfloor(physent *d, bool collided, const vec &obstacle, bool &slide, vec &floor)
