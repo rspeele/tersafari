@@ -46,7 +46,7 @@ struct physent                                  // base entity type, can be affe
     vec o, vel;                                 // origin, velocity
     vec deltapos, newpos;                       // movement interpolation
     float yaw, pitch, roll;
-    float maxspeed;                             // cubes per second, 100 for player
+    float maxspeed;                             // cubes per second, 90 for player
     int timeinair;
     float radius, eyeheight, aboveeye;          // bounding box size
     float xradius, yradius, zmargin;
@@ -63,7 +63,7 @@ struct physent                                  // base entity type, can be affe
 
     bool blocked;                               // used by physics to signal ai
 
-    physent() : o(0, 0, 0), deltapos(0, 0, 0), newpos(0, 0, 0), yaw(0), pitch(0), roll(0), maxspeed(100), 
+    physent() : o(0, 0, 0), deltapos(0, 0, 0), newpos(0, 0, 0), yaw(0), pitch(0), roll(0), maxspeed(90), 
                radius(4.1f), eyeheight(14), aboveeye(1), xradius(4.1f), yradius(4.1f), zmargin(0),
                state(CS_ALIVE), editstate(CS_ALIVE), type(ENT_PLAYER),
                collidetype(COLLIDE_ELLIPSE),
