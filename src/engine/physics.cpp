@@ -1147,10 +1147,12 @@ void walljump(physent *d, vec &dir, const vec &wall)
     vec oldvel(d->vel);
     d->vel.z = 0;
     d->vel.reflect(wall);
-    float speed = d->vel.magnitude2();
-    if (speed < d->maxspeed)
+    const float speed = d->vel.magnitude2();
+    if (speed < d->maxspeed) // make up difference with wall
     {
-        d->vel.mul(d->maxspeed / speed);
+        const float current = d->vel.dot(wall);
+        const float add = d->maxspeed - current;
+        d->vel.add(vec(wall).mul(add));
     }
     d->vel.z = JUMPVEL;
     recalcdir(d, oldvel, dir);
@@ -1166,7 +1168,7 @@ void slideagainst(physent *d, vec &dir, const vec &obstacle, bool foundfloor, bo
         wall.z = 0;
         if(!wall.iszero()) wall.normalize();
     }
-    if (d->jumping && d->vel.dot2(wall) < -d->maxspeed/10.0f)
+    if (d->jumping)
     {
         walljump(d, dir, wall);
     }
