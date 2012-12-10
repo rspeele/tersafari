@@ -1153,8 +1153,12 @@ void walljump(physent *d, vec &dir, const vec &wall)
         const float current = d->vel.dot(wall);
         const float add = d->maxspeed - current;
         d->vel.add(vec(wall).mul(add));
+        d->vel.z = JUMPVEL * max(speed / d->maxspeed, 0.5f);
     }
-    d->vel.z = JUMPVEL;
+    else
+    {
+        d->vel.z = JUMPVEL;
+    }
     recalcdir(d, oldvel, dir);
     d->jumping = false;
     game::physicstrigger(d, true, 1, 0);
