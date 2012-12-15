@@ -323,7 +323,7 @@ namespace game
         int rtime = guns[d->gunselect].attackdelay;
         if(d->lastaction && d->lastattackgun==d->gunselect && lastmillis-d->lastaction<rtime)
         {
-            drawhudmodel(d, ANIM_GUN_SHOOT|ANIM_SETSPEED, rtime/17.0f, d->lastaction);
+            drawhudmodel(d, ANIM_GUN_SHOOT|ANIM_SETSPEED, rtime, d->lastaction);
         }
         else
         {
