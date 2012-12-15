@@ -60,9 +60,6 @@ enum
 
 struct fpsentity : extentity
 {
-    int triggerstate, lasttrigger;
-    
-    fpsentity() : triggerstate(TRIGGER_RESET), lasttrigger(0) {} 
 };
 
 enum { GUN_FIST = 0, GUN_SG, GUN_CG, GUN_RL, GUN_RIFLE, GUN_GL, GUN_PISTOL, GUN_FIREBALL, GUN_ICEBALL, GUN_SLIMEBALL, GUN_BITE, GUN_BARREL, NUMGUNS };
@@ -158,10 +155,6 @@ static struct gamemodeinfo
 #define m_botmode      (m_checknot(gamemode, M_DEMO|M_LOCAL))
 #define m_mp(mode)     (m_checknot(mode, M_LOCAL))
 
-#define m_sp           (m_check(gamemode, M_DMSP | M_CLASSICSP))
-#define m_dmsp         (m_check(gamemode, M_DMSP))
-#define m_classicsp    (m_check(gamemode, M_CLASSICSP))
-
 enum { MM_AUTH = -1, MM_OPEN = 0, MM_VETO, MM_LOCKED, MM_PRIVATE, MM_PASSWORD, MM_START = MM_AUTH };
 
 static const char * const mastermodenames[] =  { "auth",   "open",   "veto",       "locked",     "private",    "password" };
@@ -232,7 +225,7 @@ enum
     N_TAKEFLAG, N_RETURNFLAG, N_RESETFLAG, N_INVISFLAG, N_TRYDROPFLAG, N_DROPFLAG, N_SCOREFLAG, N_INITFLAGS,
     N_SAYTEAM,
     N_CLIENT,
-    N_AUTHTRY, N_AUTHCHAL, N_AUTHANS, N_REQAUTH,
+    N_AUTHTRY, N_AUTHKICK, N_AUTHCHAL, N_AUTHANS, N_REQAUTH,
     N_PAUSEGAME,
     N_ADDBOT, N_DELBOT, N_INITAI, N_FROMAI, N_BOTLIMIT, N_BOTBALANCE,
     N_MAPCRC, N_CHECKMAPS,
@@ -254,14 +247,14 @@ static const int msgsizes[] =               // size inclusive message token, 0 f
     N_TIMEUP, 2, N_FORCEINTERMISSION, 1,
     N_SERVMSG, 0, N_ITEMLIST, 0, N_RESUME, 0,
     N_EDITMODE, 2, N_EDITENT, 11, N_EDITF, 16, N_EDITT, 16, N_EDITM, 16, N_FLIP, 14, N_COPY, 14, N_PASTE, 14, N_ROTATE, 15, N_REPLACE, 17, N_DELCUBE, 14, N_REMIP, 1, N_NEWMAP, 2, N_GETMAP, 1, N_SENDMAP, 0, N_EDITVAR, 0,
-    N_MASTERMODE, 2, N_KICK, 2, N_CLEARBANS, 1, N_CURRENTMASTER, 0, N_SPECTATOR, 3, N_SETMASTER, 0, N_SETTEAM, 0,
+    N_MASTERMODE, 2, N_KICK, 0, N_CLEARBANS, 1, N_CURRENTMASTER, 0, N_SPECTATOR, 3, N_SETMASTER, 0, N_SETTEAM, 0,
     N_BASES, 0, N_BASEINFO, 0, N_BASESCORE, 0, N_REPAMMO, 1, N_BASEREGEN, 6, N_ANNOUNCE, 2,
     N_LISTDEMOS, 1, N_SENDDEMOLIST, 0, N_GETDEMO, 2, N_SENDDEMO, 0,
     N_DEMOPLAYBACK, 3, N_RECORDDEMO, 2, N_STOPDEMO, 1, N_CLEARDEMOS, 2,
     N_TAKEFLAG, 3, N_RETURNFLAG, 4, N_RESETFLAG, 6, N_INVISFLAG, 3, N_TRYDROPFLAG, 1, N_DROPFLAG, 7, N_SCOREFLAG, 10, N_INITFLAGS, 0,
     N_SAYTEAM, 0,
     N_CLIENT, 0,
-    N_AUTHTRY, 0, N_AUTHCHAL, 0, N_AUTHANS, 0, N_REQAUTH, 0,
+    N_AUTHTRY, 0, N_AUTHKICK, 0, N_AUTHCHAL, 0, N_AUTHANS, 0, N_REQAUTH, 0,
     N_PAUSEGAME, 2,
     N_ADDBOT, 2, N_DELBOT, 1, N_INITAI, 0, N_FROMAI, 2, N_BOTLIMIT, 2, N_BOTBALANCE, 2,
     N_MAPCRC, 0, N_CHECKMAPS, 1,
@@ -491,7 +484,7 @@ struct fpsstate
         }
         else
         {
-            ammo[GUN_PISTOL] = m_sp ? 80 : 40;
+            ammo[GUN_PISTOL] = 40;
             ammo[GUN_GL] = 1;
         }
     }
@@ -555,7 +548,7 @@ struct fpsent : dynent, fpsstate
     {
         vec push(dir);
         push.mul(80*damage/weight);
-        if(gun==GUN_RL || gun==GUN_GL) push.mul(actor==this ? 5 : (type==ENT_AI ? 3 : 2));
+        if(gun==GUN_RL || gun==GUN_GL) push.mul(actor==this ? 5 : 2);
         vel.add(push);
     }
 
@@ -616,8 +609,6 @@ namespace entities
 
     extern void preloadentities();
     extern void renderentities();
-    extern void resettriggers();
-    extern void checktriggers();
     extern void checkitems(fpsent *d);
     extern void checkquad(int time, fpsent *d);
     extern void resetspawns();
@@ -713,32 +704,6 @@ namespace game
     extern void changemap(const char *name, int mode);
     extern void c2sinfo(bool force = false);
     extern void sendposition(fpsent *d, bool reliable = false);
-
-    // monster
-    struct monster;
-    extern vector<monster *> monsters;
-
-    extern void clearmonsters();
-    extern void preloadmonsters();
-    extern void stackmonster(monster *d, physent *o);
-    extern void updatemonsters(int curtime);
-    extern void rendermonsters();
-    extern void suicidemonster(monster *m);
-    extern void hitmonster(int damage, monster *m, fpsent *at, const vec &vel, int gun);
-    extern void monsterkilled();
-    extern void endsp(bool allkilled);
-    extern void spsummary(int accuracy);
-
-    // movable
-    struct movable;
-    extern vector<movable *> movables;
-
-    extern void clearmovables();
-    extern void stackmovable(movable *d, physent *o);
-    extern void updatemovables(int curtime);
-    extern void rendermovables();
-    extern void suicidemovable(movable *m);
-    extern void hitmovable(int damage, movable *m, fpsent *at, const vec &vel, int gun);
 
     // weapon
     extern int getweapon(const char *name);
