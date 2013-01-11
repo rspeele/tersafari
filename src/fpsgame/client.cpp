@@ -4,6 +4,7 @@ namespace game
 {
     VARP(minradarscale, 0, 384, 10000);
     VARP(maxradarscale, 1, 1024, 10000);
+    VARP(radarteammates, 0, 1, 1);
     FVARP(minimapalpha, 0, 1, 1);
 
     float calcradarscale()
@@ -37,6 +38,59 @@ namespace game
         glEnd();
     }
 
+    void drawteammate(fpsent *d, float x, float y, float s, fpsent *o, float scale)
+    {
+        vec dir = d->o;
+        dir.sub(o->o).div(scale);
+        float dist = dir.magnitude2(), maxdist = 1 - 0.05f - 0.05f;
+        if(dist >= maxdist) dir.mul(maxdist/dist);
+        dir.rotate_around_z(-camera1->yaw*RAD);
+        float bs = 0.06f*s,
+              bx = x + s*0.5f*(1.0f + dir.x),
+              by = y + s*0.5f*(1.0f + dir.y);
+        vec v(-0.5f, -0.5f, 0);
+        v.rotate_around_z((90+o->yaw-camera1->yaw)*RAD);
+        glTexCoord2f(0.0f, 0.0f); glVertex2f(bx + bs*v.x, by + bs*v.y);
+        glTexCoord2f(1.0f, 0.0f); glVertex2f(bx + bs*v.y, by - bs*v.x);
+        glTexCoord2f(1.0f, 1.0f); glVertex2f(bx - bs*v.x, by - bs*v.y);
+        glTexCoord2f(0.0f, 1.0f); glVertex2f(bx - bs*v.y, by + bs*v.x);
+    }
+
+    void drawteammates(fpsent *d, float x, float y, float s)
+    {
+        if(!radarteammates) return;
+        float scale = calcradarscale();
+        int alive = 0, dead = 0;
+        loopv(players) 
+        {
+            fpsent *o = players[i];
+            if(o != d && o->state == CS_ALIVE && isteam(o->team, d->team))
+            {
+                if(!alive++) 
+                {
+                    settexture(isteam(d->team, player1->team) ? "packages/hud/blip_blue_alive.png" : "packages/hud/blip_red_alive.png");
+                    glBegin(GL_QUADS);
+                }
+                drawteammate(d, x, y, s, o, scale);
+            }
+        }
+        if(alive) glEnd();
+        loopv(players) 
+        {
+            fpsent *o = players[i];
+            if(o != d && o->state == CS_DEAD && isteam(o->team, d->team))
+            {
+                if(!dead++) 
+                {
+                    settexture(isteam(d->team, player1->team) ? "packages/hud/blip_blue_dead.png" : "packages/hud/blip_red_dead.png");
+                    glBegin(GL_QUADS);
+                }
+                drawteammate(d, x, y, s, o, scale);
+            }
+        }
+        if(dead) glEnd();
+    }
+        
     #include "capture.h"
     #include "ctf.h"
     #include "collect.h"
@@ -58,7 +112,7 @@ namespace game
     int lastping = 0;
 
     bool connected = false, remote = false, demoplayback = false, gamepaused = false;
-    int sessionid = 0, mastermode = MM_OPEN;
+    int sessionid = 0, mastermode = MM_OPEN, gamespeed = 100;
     string servinfo = "", servauth = "", connectpass = "";
 
     VARP(deadpush, 1, 2, 20);
@@ -296,7 +350,7 @@ namespace game
         vector<char> buf;
         string cn;
         int numclients = 0;
-        if(local)
+        if(local && connected)
         {
             formatstring(cn)("%d", player1->clientnum);
             buf.put(cn, strlen(cn));
@@ -635,13 +689,38 @@ namespace game
         printvar(player1, id);
     }
 
-    void pausegame(int *val)
+    void pausegame(bool val)
     {
-        addmsg(N_PAUSEGAME, "ri", *val > 0 ? 1 : 0);
+        if(!connected) return;
+        if(!remote) server::forcepaused(val);
+        else addmsg(N_PAUSEGAME, "ri", val ? 1 : 0);
     }
-    COMMAND(pausegame, "i");
+    ICOMMAND(pausegame, "i", (int *val), pausegame(*val > 0));
+    ICOMMAND(paused, "iN$", (int *val, int *numargs, ident *id),
+    { 
+        if(*numargs > 0) pausegame(clampvar(id, *val, 0, 1) > 0);
+        else if(*numargs < 0) intret(gamepaused ? 1 : 0);
+        else printvar(id, gamepaused ? 1 : 0); 
+    });
 
     bool ispaused() { return gamepaused; }
+
+    bool allowmouselook() { return !gamepaused || !remote || m_edit; }
+
+    void changegamespeed(int val)
+    {
+        if(!connected) return;
+        if(!remote) server::forcegamespeed(val);
+        else addmsg(N_GAMESPEED, "ri", val);
+    }
+    ICOMMAND(gamespeed, "iN$", (int *val, int *numargs, ident *id),
+    {
+        if(*numargs > 0) changegamespeed(clampvar(id, *val, 10, 1000));
+        else if(*numargs < 0) intret(gamespeed);
+        else printvar(id, gamespeed);
+    });
+
+    int scaletime(int t) { return t*gamespeed; }
 
     // collect c2s messages conveniently
     vector<uchar> messages;
@@ -745,6 +824,7 @@ namespace game
         sendcrc = senditemstoserver = false;
         demoplayback = false;
         gamepaused = false;
+        gamespeed = 100;
         clearclients(false);
         if(cleanup)
         {
@@ -949,6 +1029,7 @@ namespace game
         int type;
         while(p.remaining()) switch(type = getint(p))
         {
+            case N_DEMOPACKET: break;
             case N_POS:                        // position of another client
             {
                 int cn = getuint(p), physstate = p.get(), flags = getuint(p);
@@ -1082,10 +1163,12 @@ namespace game
     {
         static char text[MAXTRANS];
         int type;
-        bool mapchanged = false;
+        bool mapchanged = false, demopacket = false;
 
         while(p.remaining()) switch(type = getint(p))
         {
+            case N_DEMOPACKET: demopacket = true; break;
+
             case N_SERVINFO:                   // welcome messsage from the server
             {
                 int mycn = getint(p), prot = getint(p);
@@ -1112,12 +1195,29 @@ namespace game
 
             case N_PAUSEGAME:
             {
-                int val = getint(p);
-                gamepaused = val > 0;
-                conoutf("game is %s", gamepaused ? "paused" : "resumed");
+                bool val = getint(p) > 0;
+                int cn = getint(p);
+                fpsent *a = cn >= 0 ? getclient(cn) : NULL;
+                if(!demopacket)
+                {
+                    gamepaused = val;
+                    player1->attacking = false;
+                }
+                if(a) conoutf("%s %s the game", colorname(a), val ? "paused" : "resumed");
+                else conoutf("game is %s", val ? "paused" : "resumed");
                 break;
             }
 
+            case N_GAMESPEED:
+            {
+                int val = clamp(getint(p), 10, 1000), cn = getint(p);
+                fpsent *a = cn >= 0 ? getclient(cn) : NULL;
+                if(!demopacket) gamespeed = val;
+                if(a) conoutf("%s set gamespeed to %d", colorname(a), val);
+                else conoutf("gamespeed is %d", val);
+                break;
+            }
+                
             case N_CLIENT:
             {
                 int cn = getint(p), len = getuint(p);
@@ -1348,11 +1448,12 @@ namespace game
 
             case N_DIED:
             {
-                int vcn = getint(p), acn = getint(p), frags = getint(p);
+                int vcn = getint(p), acn = getint(p), frags = getint(p), tfrags = getint(p);
                 fpsent *victim = getclient(vcn),
                        *actor = getclient(acn);
                 if(!actor) break;
                 actor->frags = frags;
+                if(m_teammode) setteaminfo(actor->team, tfrags);
                 if(actor!=player1 && (!cmode || !cmode->hidefrags()))
                 {
                     defformatstring(ds)("%d", actor->frags);
@@ -1362,6 +1463,17 @@ namespace game
                 killed(victim, actor);
                 break;
             }
+
+            case N_TEAMINFO:
+                for(;;)
+                {
+                    getstring(text, p);
+                    if(p.overread() || !text[0]) break;
+                    int frags = getint(p);
+                    if(p.overread()) break;
+                    if(m_teammode) setteaminfo(text, frags);
+                }
+                break;
 
             case N_GUNSELECT:
             {
@@ -1397,7 +1509,7 @@ namespace game
                 if(!entities::ents.inrange(i)) break;
                 entities::setspawn(i, true);
                 ai::itemspawned(i);
-                playsound(S_ITEMSPAWN, &entities::ents[i]->o, NULL, 0, 0, -1, 0, 1500);
+                playsound(S_ITEMSPAWN, &entities::ents[i]->o, NULL, 0, 0, 0, -1, 0, 1500);
                 #if 0
                 const char *name = entities::itemname(i);
                 if(name) particle_text(entities::ents[i]->o, name, PART_TEXT, 2000, 0x32FF64, 4.0f, -8);
@@ -1646,8 +1758,8 @@ namespace game
             case N_ANNOUNCE:
             {
                 int t = getint(p);
-                if     (t==I_QUAD)  { playsound(S_V_QUAD10, NULL, NULL, 0, 0, -1, 0, 3000);  conoutf(CON_GAMEINFO, "\f2quad damage will spawn in 10 seconds!"); }
-                else if(t==I_BOOST) { playsound(S_V_BOOST10, NULL, NULL, 0, 0, -1, 0, 3000); conoutf(CON_GAMEINFO, "\f2+10 health will spawn in 10 seconds!"); }
+                if     (t==I_QUAD)  { playsound(S_V_QUAD10, NULL, NULL, 0, 0, 0, -1, 0, 3000);  conoutf(CON_GAMEINFO, "\f2quad damage will spawn in 10 seconds!"); }
+                else if(t==I_BOOST) { playsound(S_V_BOOST10, NULL, NULL, 0, 0, 0, -1, 0, 3000); conoutf(CON_GAMEINFO, "\f2+10 health will spawn in 10 seconds!"); }
                 break;
             }
 
@@ -1712,21 +1824,20 @@ namespace game
         }
     }
 
-    void receivefile(uchar *data, int len)
+    void receivefile(packetbuf &p)
     {
-        ucharbuf p(data, len);
-        int type = getint(p);
-        data += p.length();
-        len -= p.length();
-        switch(type)
+        int type;
+        while(p.remaining()) switch(type = getint(p))
         {
+            case N_DEMOPACKET: return;
             case N_SENDDEMO:
             {
                 defformatstring(fname)("%d.dmo", lastmillis);
                 stream *demo = openrawfile(fname, "wb");
                 if(!demo) return;
                 conoutf("received demo \"%s\"", fname);
-                demo->write(data, len);
+                ucharbuf b = p.subbuf(p.remaining());
+                demo->write(b.buf, b.maxlen);
                 delete demo;
                 break;
             }
@@ -1741,7 +1852,8 @@ namespace game
                 stream *map = openrawfile(path(fname), "wb");
                 if(!map) return;
                 conoutf("received map");
-                map->write(data, len);
+                ucharbuf b = p.subbuf(p.remaining());
+                map->write(b.buf, b.maxlen);
                 delete map;
                 if(load_world(mname, oldname[0] ? oldname : NULL))
                     entities::spawnitems(true);
@@ -1765,7 +1877,7 @@ namespace game
                 break;
 
             case 2:
-                receivefile(p.buf, p.maxlen);
+                receivefile(p);
                 break;
         }
     }

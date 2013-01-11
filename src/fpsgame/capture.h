@@ -327,6 +327,8 @@ struct captureclientmode : clientmode
     {
         static const char *basemodels[3] = { "base/neutral", "base/red", "base/blue" };
         loopi(3) preloadmodel(basemodels[i]);
+        preloadsound(S_V_BASECAP);
+        preloadsound(S_V_BASELOST);
     }
 
     void rendergame()
@@ -503,6 +505,7 @@ struct captureclientmode : clientmode
         if(showenemies) drawblips(d, blipsize, fw, fh, -2);
         glPopMatrix();
         if(basenumbers) popfont();
+        drawteammates(d, x, y, s);
         if(d->state == CS_DEAD)
         {
             int wait = respawnwait(d);
@@ -558,17 +561,17 @@ struct captureclientmode : clientmode
         {
             if(strcmp(b.owner, owner))
             {
-                if(!b.name[0]) conoutf(CON_GAMEINFO, "%s captured base %d", owner, i+1);
-                else if(basenumbers) conoutf(CON_GAMEINFO, "%s captured %s (%d)", owner, b.name, i+1);
-                else conoutf(CON_GAMEINFO, "%s captured %s", owner, b.name);
+                if(!b.name[0]) conoutf(CON_GAMEINFO, "%s captured base %d", teamcolor(owner, owner), i+1);
+                else if(basenumbers) conoutf(CON_GAMEINFO, "%s captured %s (%d)", teamcolor(owner, owner), b.name, i+1);
+                else conoutf(CON_GAMEINFO, "%s captured %s", teamcolor(owner, owner), b.name);
                 if(!strcmp(owner, player1->team)) playsound(S_V_BASECAP);
             }
         }
         else if(b.owner[0])
         {
-            if(!b.name[0]) conoutf(CON_GAMEINFO, "%s lost base %d", b.owner, i+1);
-            else if(basenumbers) conoutf(CON_GAMEINFO, "%s lost %s (%d)", b.owner, b.name, i+1);
-            else conoutf(CON_GAMEINFO, "%s lost %s", b.owner, b.name);
+            if(!b.name[0]) conoutf(CON_GAMEINFO, "%s lost base %d", teamcolor(b.owner, b.owner), i+1);
+            else if(basenumbers) conoutf(CON_GAMEINFO, "%s lost %s (%d)", teamcolor(b.owner, b.owner), b.name, i+1);
+            else conoutf(CON_GAMEINFO, "%s lost %s", teamcolor(b.owner, b.owner), b.name);
             if(!strcmp(b.owner, player1->team)) playsound(S_V_BASELOST);
         }
         if(strcmp(b.owner, owner)) particle_splash(PART_SPARK, 200, 250, b.ammopos, owner[0] ? (strcmp(owner, player1->team) ? 0x802020 : 0x2020FF) : 0x208020, 0.24f);
@@ -587,7 +590,7 @@ struct captureclientmode : clientmode
     void setscore(int base, const char *team, int total)
     {
         findscore(team).total = total;
-        if(total>=10000) conoutf(CON_GAMEINFO, "team %s captured all bases", team);
+        if(total>=10000) conoutf(CON_GAMEINFO, "%s captured all bases", teamcolor(team, team));
         else if(bases.inrange(base))
         {
             baseinfo &b = bases[base];
@@ -879,8 +882,13 @@ ICOMMAND(insidebases, "", (),
                     ci->state.health = min(ci->state.health + ticks*REGENHEALTH, ci->state.maxhealth);
                     notify = true;
                 }
-                if(ci->state.armour < itemstats[I_GREENARMOUR-I_SHELLS].max)
+                if(ci->state.armourtype != A_GREEN || ci->state.armour < itemstats[I_GREENARMOUR-I_SHELLS].max)
                 {
+                    if(ci->state.armourtype != A_GREEN)
+                    {
+                        ci->state.armourtype = A_GREEN;
+                        ci->state.armour = 0;
+                    }
                     ci->state.armour = min(ci->state.armour + ticks*REGENARMOUR, itemstats[I_GREENARMOUR-I_SHELLS].max);
                     notify = true;
                 }
@@ -1026,6 +1034,11 @@ ICOMMAND(insidebases, "", (),
         leavebases(ci->team, ci->state.o);
     }
 
+    bool canspawn(clientinfo *ci, bool connecting)
+    {
+        return m_regencapture || connecting || !ci->state.lastdeath || gamemillis+curtime-ci->state.lastdeath >= RESPAWNSECS*1000;
+    }
+
     void moved(clientinfo *ci, const vec &oldpos, bool oldclip, const vec &newpos, bool newclip)
     {
         if(notgotbases) return;
@@ -1102,6 +1115,7 @@ case N_BASEREGEN:
     if(regen && m_capture)
     {
         regen->health = health;
+        regen->armourtype = A_GREEN;
         regen->armour = armour;
         if(ammotype>=GUN_SG && ammotype<=GUN_PISTOL) regen->ammo[ammotype] = ammo;
     }

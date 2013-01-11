@@ -359,16 +359,22 @@ vector<const char *> preloadmodels;
 
 void preloadmodel(const char *name)
 {
-    if(mdllookup.access(name)) return;
+    if(!name || !name[0] || mdllookup.access(name)) return;
     preloadmodels.add(newstring(name));
 }
 
-void flushpreloadedmodels()
+void flushpreloadedmodels(bool msg)
 {
     loopv(preloadmodels)
     {
         loadprogress = float(i+1)/preloadmodels.length();
-        loadmodel(preloadmodels[i], -1, true);
+        model *m = loadmodel(preloadmodels[i], -1, msg);
+        if(!m) { if(msg) conoutf(CON_WARN, "could not load model: %s", preloadmodels[i]); }
+        else
+        {
+            m->preloadmeshes();
+            m->preloadshaders();
+        }
     }
     preloadmodels.deletearrays();
     loadprogress = 0;
@@ -390,8 +396,13 @@ void preloadusedmapmodels(bool msg, bool bih)
         int mmindex = mapmodels[i];
         mapmodelinfo *mmi = getmminfo(mmindex);
         if(!mmi) { if(msg) conoutf(CON_WARN, "could not find map model: %d", mmindex); }
-        else if(!loadmodel(NULL, mmindex, msg)) { if(msg) conoutf(CON_WARN, "could not load model: %s", mmi->name); }
-        else if(mmi->m && bih) mmi->m->preloadBIH();
+        else if(mmi->name[0] && !loadmodel(NULL, mmindex, msg)) { if(msg) conoutf(CON_WARN, "could not load model: %s", mmi->name); }
+        else if(mmi->m)
+        {
+            if(bih) mmi->m->preloadBIH();
+            mmi->m->preloadmeshes();
+            mmi->m->preloadshaders();
+        }
     }
     loadprogress = 0;
 }
@@ -410,6 +421,7 @@ model *loadmodel(const char *name, int i, bool msg)
     if(mm) m = *mm;
     else
     { 
+        if(!name[0] || loadingmodel) return NULL;
         if(msg)
         {
             defformatstring(filename)("packages/models/%s", name);
@@ -429,12 +441,6 @@ model *loadmodel(const char *name, int i, bool msg)
     }
     if(mapmodels.inrange(i) && !mapmodels[i].m) mapmodels[i].m = m;
     return m;
-}
-
-void preloadmodelshaders()
-{
-    if(initing) return;
-    enumerate(mdllookup, model *, m, m->preloadshaders());
 }
 
 void clear_mdls()
@@ -793,6 +799,7 @@ void rendermapmodel(int idx, int anim, const vec &o, float yaw, float pitch, int
     if(!mapmodels.inrange(idx)) return;
     mapmodelinfo &mmi = mapmodels[idx];
     model *m = mmi.m ? mmi.m : loadmodel(mmi.name);
+    if(!m) return;
 
     vec center, bbradius;
     m->boundbox(center, bbradius);
@@ -1040,6 +1047,7 @@ void renderclient(dynent *d, const char *mdlname, modelattach *attachments, int 
     if(d->type==ENT_PLAYER) flags |= MDL_FULLBRIGHT;
     else flags |= MDL_CULL_DIST;
     if(d->state==CS_LAGGED) fade = min(fade, 0.3f);
+    if(modelpreviewing) flags &= ~(MDL_FULLBRIGHT | MDL_CULL_VFC | MDL_CULL_OCCLUDED | MDL_CULL_QUERY | MDL_CULL_DIST);
     rendermodel(mdlname, anim, o, yaw, pitch, flags, d, attachments, basetime, 0, fade);
 }
 

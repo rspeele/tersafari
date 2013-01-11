@@ -83,14 +83,11 @@ namespace game
 
     void respawnself()
     {
-        if(paused || ispaused()) return;
+        if(ispaused()) return;
         if(m_mp(gamemode))
         {
-            if(player1->respawned!=player1->lifesequence)
-            {
-                addmsg(N_TRYSPAWN, "rc", player1);
-                player1->respawned = player1->lifesequence;
-            }
+            int seq = (player1->lifesequence<<16)|((lastmillis/1000)&0xFFFF);
+            if(player1->respawned!=seq) { addmsg(N_TRYSPAWN, "rc", player1); player1->respawned = seq; }
         }
         else
         {
@@ -358,6 +355,8 @@ namespace game
         }
     }
 
+    VARP(teamcolorfrags, 0, 1, 1);
+
     void killed(fpsent *d, fpsent *actor)
     {
         if(d->state==CS_EDITING)
@@ -372,21 +371,29 @@ namespace game
         fpsent *h = followingplayer();
         if(!h) h = player1;
         int contype = d==h || actor==h ? CON_FRAG_SELF : CON_FRAG_OTHER;
-        string dname, aname;
-        copystring(dname, d==player1 ? "you" : colorname(d));
-        copystring(aname, actor==player1 ? "you" : colorname(actor));
+        const char *dname = "", *aname = "";
+        if(m_teammode && teamcolorfrags)
+        {
+            dname = teamcolorname(d, "you");
+            aname = teamcolorname(actor, "you");
+        }
+        else
+        {
+            dname = colorname(d, NULL, "", "", "you");
+            aname = colorname(actor, NULL, "", "", "you");
+        }
         if(d==actor)
             conoutf(contype, "\f2%s suicided%s", dname, d==player1 ? "!" : "");
         else if(isteam(d->team, actor->team))
         {
             contype |= CON_TEAMKILL;
-            if(actor==player1) conoutf(contype, "\f3you fragged a teammate (%s)", dname);
-            else if(d==player1) conoutf(contype, "\f3you got fragged by a teammate (%s)", aname);
+            if(actor==player1) conoutf(contype, "\f6%s fragged a teammate (%s)", aname, dname);
+            else if(d==player1) conoutf(contype, "\f6%s got fragged by a teammate (%s)", dname, aname);
             else conoutf(contype, "\f2%s fragged a teammate (%s)", aname, dname);
         }
         else
         {
-            if(d==player1) conoutf(contype, "\f2you got fragged by %s", aname);
+            if(d==player1) conoutf(contype, "\f2%s got fragged by %s", dname, aname);
             else conoutf(contype, "\f2%s fragged %s", aname, dname);
         }
         deathstate(d);
@@ -495,6 +502,8 @@ namespace game
         clearbouncers();
         clearragdolls();
 
+        clearteaminfo();
+
         // reset perma-state
         loopv(players)
         {
@@ -588,22 +597,50 @@ namespace game
         return NULL;
     }
 
-    bool duplicatename(fpsent *d, const char *name = NULL)
+    bool duplicatename(fpsent *d, const char *name = NULL, const char *alt = NULL)
     {
         if(!name) name = d->name;
+        if(alt && d != player1 && !strcmp(name, alt)) return true;
         loopv(players) if(d!=players[i] && !strcmp(name, players[i]->name)) return true;
         return false;
     }
 
-    const char *colorname(fpsent *d, const char *name, const char *prefix)
+    static string cname[3];
+    static int cidx = 0;
+
+    const char *colorname(fpsent *d, const char *name, const char *prefix, const char *suffix, const char *alt)
     {
-        if(!name) name = d->name;
-        if(name[0] && !duplicatename(d, name) && d->aitype == AI_NONE) return name;
-        static string cname[3];
-        static int cidx = 0;
+        if(!name) name = alt && d == player1 ? alt : d->name; 
+        bool dup = !name[0] || duplicatename(d, name, alt) || d->aitype != AI_NONE;
+        if(dup || prefix[0] || suffix[0])
+        {
+            cidx = (cidx+1)%3;
+            if(dup) formatstring(cname[cidx])(d->aitype == AI_NONE ? "%s%s \fs\f5(%d)\fr%s" : "%s%s \fs\f5[%d]\fr%s", prefix, name, d->clientnum, suffix);
+            else formatstring(cname[cidx])("%s%s%s", prefix, name, suffix);
+            return cname[cidx];
+        }
+        return name;
+    }
+
+    VARP(teamcolortext, 0, 1, 1);
+
+    const char *teamcolorname(fpsent *d, const char *alt)
+    {
+        if(!teamcolortext || !m_teammode) return colorname(d, NULL, "", "", alt);
+        return colorname(d, NULL, isteam(d->team, player1->team) ? "\fs\f1" : "\fs\f3", "\fr", alt); 
+    }
+
+    const char *teamcolor(const char *name, bool sameteam, const char *alt)
+    {
+        if(!teamcolortext || !m_teammode) return sameteam || !alt ? name : alt;
         cidx = (cidx+1)%3;
-        formatstring(cname[cidx])(d->aitype == AI_NONE ? "%s%s \fs\f5(%d)\fr" : "%s%s \fs\f5[%d]\fr", prefix, name, d->clientnum);
+        formatstring(cname[cidx])(sameteam ? "\fs\f1%s\fr" : "\fs\f3%s\fr", sameteam || !alt ? name : alt);
         return cname[cidx];
+    }    
+    
+    const char *teamcolor(const char *name, const char *team, const char *alt)
+    {
+        return teamcolor(name, team && isteam(team, player1->team), alt);
     }
 
     void suicide(physent *d)
@@ -613,10 +650,10 @@ namespace game
             if(d->state!=CS_ALIVE) return;
             fpsent *pl = (fpsent *)d;
             if(!m_mp(gamemode)) killed(pl, pl);
-            else if(pl->suicided!=pl->lifesequence)
+            else 
             {
-                addmsg(N_SUICIDE, "rc", pl);
-                pl->suicided = pl->lifesequence;
+                int seq = (pl->lifesequence<<16)|((lastmillis/1000)&0xFFFF);
+                if(pl->suicided!=seq) { addmsg(N_SUICIDE, "rc", pl); pl->suicided = seq; }
             }
         }
     }
@@ -834,8 +871,8 @@ namespace game
 
     bool serverinfostartcolumn(g3d_gui *g, int i)
     {
-        static const char *names[] = { "ping ", "players ", "map ", "mode ", "master ", "host ", "port ", "description " };
-        static const int struts[] =  { 7,       7,          14,     13,      8,         14,      7,       24 };
+        static const char *names[] = { "ping ", "players ", "mode ", "map ", "time ", "master ", "host ", "port ", "description " };
+        static const int struts[] =  { 7,       7,          13,     14,      7,      8,         14,      7,       24 };
         if(size_t(i) >= sizeof(names)/sizeof(names[0])) return false;
         g->pushlist();
         g->text(names[i], 0xFFFF80, !i ? " " : NULL);
@@ -874,18 +911,19 @@ namespace game
                 case 2:
                 case 3:
                 case 4:
+                case 5:
                     if(g->button(" ", 0xFFFFDD)&G3D_UP) return true;
                     break;
 
-                case 5:
+                case 6:
                     if(g->buttonf("%s ", 0xFFFFDD, NULL, name)&G3D_UP) return true;
                     break;
 
-                case 6:
+                case 7:
                     if(g->buttonf("%d ", 0xFFFFDD, NULL, port)&G3D_UP) return true;
                     break;
 
-                case 7:
+                case 8:
                     if(ping < 0)
                     {
                         if(g->button(sdesc, 0xFFFFDD)&G3D_UP) return true;
@@ -914,26 +952,36 @@ namespace game
                 break;
 
             case 2:
-                if(g->buttonf("%.25s ", 0xFFFFDD, NULL, map)&G3D_UP) return true;
-                break;
-
-            case 3:
                 if(g->buttonf("%s ", 0xFFFFDD, NULL, attr.length()>=2 ? server::modename(attr[1], "") : "")&G3D_UP) return true;
                 break;
 
+            case 3:
+                if(g->buttonf("%.25s ", 0xFFFFDD, NULL, map)&G3D_UP) return true;
+                break;
+
             case 4:
+                if(attr.length()>=3 && attr[2] > 0)
+                {
+                    int secs = clamp(attr[2], 0, 59*60+59),
+                        mins = secs/60;
+                    secs %= 60;
+                    if(g->buttonf("%d:%02d ", 0xFFFFDD, NULL, mins, secs)&G3D_UP) return true;
+                }
+                else if(g->buttonf(" ", 0xFFFFDD)&G3D_UP) return true;
+                break;
+            case 5:
                 if(g->buttonf("%s%s ", 0xFFFFDD, NULL, attr.length()>=5 ? mastermodecolor(attr[4], "") : "", attr.length()>=5 ? server::mastermodename(attr[4], "") : "")&G3D_UP) return true;
                 break;
 
-            case 5:
+            case 6:
                 if(g->buttonf("%s ", 0xFFFFDD, NULL, name)&G3D_UP) return true;
                 break;
 
-            case 6:
+            case 7:
                 if(g->buttonf("%d ", 0xFFFFDD, NULL, port)&G3D_UP) return true;
                 break;
 
-            case 7:
+            case 8:
                 if(g->buttonf("%.25s", 0xFFFFDD, NULL, sdesc)&G3D_UP) return true;
                 break;
         }

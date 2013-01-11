@@ -128,6 +128,12 @@ static inline T clamp(T a, U b, U c)
 #define PATHDIV '/'
 #endif
 
+#ifdef __GNUC__
+#define PRINTFARGS(fmt, args) __attribute__((format(printf, fmt, args)))
+#else
+#define PRINTFARGS(fmt, args)
+#endif
+
 // easy safe strings
 
 #define MAXSTRLEN 260
@@ -141,7 +147,7 @@ struct stringformatter
 {
     char *buf;
     stringformatter(char *buf): buf((char *)buf) {}
-    void operator()(const char *fmt, ...)
+    void operator()(const char *fmt, ...) PRINTFARGS(2, 3)
     {
         va_list v;
         va_start(v, fmt);
@@ -392,6 +398,40 @@ template<class T> struct isclass
     template<class C> static int test(...);
     enum { yes = sizeof(test<T>(0)) == 1 ? 1 : 0, no = yes^1 };
 };
+
+static inline uint hthash(const char *key)
+{
+    uint h = 5381;
+    for(int i = 0, k; (k = key[i]); i++) h = ((h<<5)+h)^k;    // bernstein k=33 xor
+    return h;
+}
+
+static inline bool htcmp(const char *x, const char *y)
+{
+    return !strcmp(x, y);
+}
+
+static inline uint hthash(int key)
+{
+    return key;
+}
+
+static inline bool htcmp(int x, int y)
+{
+    return x==y;
+}
+
+#ifndef STANDALONE
+static inline uint hthash(GLuint key)
+{
+    return key;
+}
+
+static inline bool htcmp(GLuint x, GLuint y)
+{
+    return x==y;
+}
+#endif
 
 template <class T> struct vector
 {
@@ -655,41 +695,14 @@ template <class T> struct vector
         if(ulen) downheap(0);
         return e;
     }
+
+    template<class K> 
+    int htfind(const K &key)
+    {
+        loopi(ulen) if(htcmp(key, buf[i])) return i;
+        return -1;
+    }
 };
-
-static inline uint hthash(const char *key)
-{
-    uint h = 5381;
-    for(int i = 0, k; (k = key[i]); i++) h = ((h<<5)+h)^k;    // bernstein k=33 xor
-    return h;
-}
-
-static inline bool htcmp(const char *x, const char *y)
-{
-    return !strcmp(x, y);
-}
-
-static inline uint hthash(int key)
-{
-    return key;
-}
-
-static inline bool htcmp(int x, int y)
-{
-    return x==y;
-}
-
-#ifndef STANDALONE
-static inline uint hthash(GLuint key)
-{
-    return key;
-}
-
-static inline bool htcmp(GLuint x, GLuint y)
-{
-    return x==y;
-}
-#endif
 
 template<class T> struct hashset
 {
@@ -1088,7 +1101,7 @@ struct stream
     virtual bool getline(char *str, int len);
     virtual bool putstring(const char *str) { int len = (int)strlen(str); return write(str, len) == len; }
     virtual bool putline(const char *str) { return putstring(str) && putchar('\n'); }
-    virtual int printf(const char *fmt, ...);
+    virtual int printf(const char *fmt, ...) PRINTFARGS(2, 3);
     virtual uint getcrc() { return 0; }
 
     template<class T> int put(const T *v, int n) { return write(v, n*sizeof(T))/sizeof(T); } 
@@ -1172,7 +1185,27 @@ extern bool listdir(const char *dir, bool rel, const char *ext, vector<char *> &
 extern int listfiles(const char *dir, const char *ext, vector<char *> &files);
 extern int listzipfiles(const char *dir, const char *ext, vector<char *> &files);
 extern void seedMT(uint seed);
-extern uint randomMT(void);
+extern uint randomMT();
+extern int guessnumcpus();
+
+extern void putint(ucharbuf &p, int n);
+extern void putint(packetbuf &p, int n);
+extern void putint(vector<uchar> &p, int n);
+extern int getint(ucharbuf &p);
+extern void putuint(ucharbuf &p, int n);
+extern void putuint(packetbuf &p, int n);
+extern void putuint(vector<uchar> &p, int n);
+extern int getuint(ucharbuf &p);
+extern void putfloat(ucharbuf &p, float f);
+extern void putfloat(packetbuf &p, float f);
+extern void putfloat(vector<uchar> &p, float f);
+extern float getfloat(ucharbuf &p);
+extern void sendstring(const char *t, ucharbuf &p);
+extern void sendstring(const char *t, packetbuf &p);
+extern void sendstring(const char *t, vector<uchar> &p);
+extern void getstring(char *t, ucharbuf &p, int len);
+template<size_t N> static inline void getstring(char (&t)[N], ucharbuf &p) { getstring(t, p, int(N)); }
+extern void filtertext(char *dst, const char *src, bool whitespace = true, int len = sizeof(string)-1);
 
 #endif
 

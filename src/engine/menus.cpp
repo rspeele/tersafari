@@ -375,7 +375,7 @@ static const char *getsval(char *var)
 void guislider(char *var, int *min, int *max, char *onchange)
 {
 	if(!cgui) return;
-    int oldval = getval(var), val = oldval, vmin = *max ? *min : getvarmin(var), vmax = *max ? *max : getvarmax(var);
+    int oldval = getval(var), val = oldval, vmin = *max > INT_MIN ? *min : getvarmin(var), vmax = *max > INT_MIN ? *max : getvarmax(var);
     cgui->slider(val, vmin, vmax, GUI_TITLE_COLOR);
     if(val != oldval) updateval(var, val, onchange);
 }
@@ -576,7 +576,7 @@ COMMAND(guibar,"");
 COMMAND(guistrut,"fi");
 COMMAND(guispring, "i");
 COMMAND(guiimage,"ssfis");
-COMMAND(guislider,"siis");
+COMMAND(guislider,"sbbs");
 COMMAND(guilistslider, "sss");
 COMMAND(guinameslider, "ssss");
 COMMAND(guiradio,"ssfs");
@@ -588,6 +588,52 @@ COMMAND(guikeyfield, "sis");
 COMMAND(guieditor, "siii");
 COMMAND(guicolor, "i");
 COMMAND(guitextbox, "siii");
+
+void guiplayerpreview(int *model, int *team, int *weap, char *action, float *scale, int *overlaid)
+{
+    if(!cgui) return;
+    int ret = cgui->playerpreview(*model, *team, *weap, *scale, *overlaid!=0);
+    if(ret&G3D_UP)
+    {
+        if(*action)
+        {
+            updatelater.add().schedule(action);
+            if(shouldclearmenu) clearlater = true;
+        }
+    }
+}
+COMMAND(guiplayerpreview, "iiisfi");
+
+void guimodelpreview(char *model, char *animspec, char *action, float *scale, int *overlaid)
+{
+    if(!cgui) return;
+    int anim = ANIM_ALL;
+    if(animspec[0])
+    {
+        if(isdigit(animspec[0]))
+        {
+            anim = parseint(animspec);
+            if(anim >= 0) anim %= ANIM_INDEX;
+            else anim = ANIM_ALL;
+        }
+        else
+        {
+            vector<int> anims;
+            findanims(animspec, anims);
+            if(anims.length()) anim = anims[0];
+        }
+    }
+    int ret = cgui->modelpreview(model, anim|ANIM_LOOP, *scale, *overlaid!=0);
+    if(ret&G3D_UP)
+    {
+        if(*action)
+        {
+            updatelater.add().schedule(action);
+            if(shouldclearmenu) clearlater = true;
+        }
+    }
+}
+COMMAND(guimodelpreview, "sssfi");
 
 struct change
 {

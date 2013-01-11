@@ -79,6 +79,7 @@ namespace ai
                 bbmin.min(vec(w.o).sub(radius));
                 bbmax.max(vec(w.o).add(radius));
             }
+            if(first < last) lastwp = max(lastwp, last-1);
             build(indices.getbuf(), indices.length(), bbmin, bbmax);
         }
 
@@ -185,7 +186,7 @@ namespace ai
     void buildwpcache()
     {
         loopi(NUMWPCACHES) if(wpcaches[i].maxdepth < 0)
-            wpcaches[i].build(i > 0 ? wpcaches[i-1].lastwp+1 : 0, i+1 >= NUMWPCACHES || wpcaches[i+1].maxdepth < 0 ? -1 : wpcaches[i+1].firstwp);
+            wpcaches[i].build(i > 0 ? wpcaches[i-1].lastwp+1 : 1, i+1 >= NUMWPCACHES || wpcaches[i+1].maxdepth < 0 ? -1 : wpcaches[i+1].firstwp);
         clearedwpcaches = 0;
         lastwpcache = waypoints.length();
 
@@ -491,7 +492,7 @@ namespace ai
         return !route.empty();
     }
 
-    VAR(dropwaypoints, 0, 0, 1);
+    VARF(dropwaypoints, 0, 0, 1, { player1->lastnode = -1; });
 
     int addwaypoint(const vec &o, int weight = -1)
     {
@@ -637,7 +638,7 @@ namespace ai
     bool cleanwaypoints()
     {
         int cleared = 0;
-        loopv(waypoints)
+        for(int i = 1; i < waypoints.length(); i++)
         {
             waypoint &w = waypoints[i];
             if(clipped(w.o))
@@ -745,7 +746,7 @@ namespace ai
         if(noedit(true)) return;
         vec o = sel.o.tovec().sub(0.1f), s = sel.s.tovec().mul(sel.grid).add(o).add(0.1f);
         int cleared = 0;
-        loopv(waypoints)
+        for(int i = 1; i < waypoints.length(); i++)
         {
             waypoint &w = waypoints[i];
             if(w.o.x >= o.x && w.o.x <= s.x && w.o.y >= o.y && w.o.y <= s.y && w.o.z >= o.z && w.o.z <= s.z)
@@ -763,5 +764,30 @@ namespace ai
         }
     }
     COMMAND(delselwaypoints, "");
+
+    void movewaypoints(const vec &d)
+    {
+        if(noedit(true)) return;
+        int worldsize = getworldsize();
+        if(d.x < -worldsize || d.x > worldsize || d.y < -worldsize || d.y > worldsize || d.z < -worldsize || d.z > worldsize)
+        {
+            clearwaypoints();
+            return;
+        }
+        int cleared = 0;
+        for(int i = 1; i < waypoints.length(); i++)
+        {
+            waypoint &w = waypoints[i];
+            w.o.add(d);
+            if(!insideworld(w.o)) { w.links[0] = 0; w.links[1] = 0xFFFF; cleared++; }
+        }
+        if(cleared)
+        {
+            player1->lastnode = -1;
+            remapwaypoints();
+        }
+        clearwpcache();
+    }
+    ICOMMAND(movewaypoints, "iii", (int *dx, int *dy, int *dz), movewaypoints(vec(*dx, *dy, *dz)));
 }
 

@@ -8,23 +8,28 @@
 
 const int MAXCLIPPLANES = 1024;
 static clipplanes clipcache[MAXCLIPPLANES];
-static int clipcacheversion = 0;
+static int clipcacheversion = -2;
 
-static inline clipplanes &getclipplanes(const cube &c, const ivec &o, int size)
+static inline clipplanes &getclipplanes(const cube &c, const ivec &o, int size, bool collide = true, int offset = 0)
 {
     clipplanes &p = clipcache[int(&c - worldroot)&(MAXCLIPPLANES-1)];
-    if(p.owner != &c || p.version != clipcacheversion) 
+    if(p.owner != &c || p.version != clipcacheversion+offset) 
     {
         p.owner = &c;
-        p.version = clipcacheversion;
-        genclipplanes(c, o.x, o.y, o.z, size, p);
+        p.version = clipcacheversion+offset;
+        genclipplanes(c, o.x, o.y, o.z, size, p, collide);
     }
     return p;
 }
 
 void resetclipplanes()
 {
-    if(!clipcacheversion++) memset(clipcache, 0, sizeof(clipcache));
+    clipcacheversion += 2;
+    if(!clipcacheversion)
+    {
+        memset(clipcache, 0, sizeof(clipcache));
+        clipcacheversion = 2;
+    }
 }
 
 /////////////////////////  ray - cube collision ///////////////////////////////////////////////
@@ -304,7 +309,7 @@ float raycube(const vec &o, const vec &ray, float radius, int mode, int size, ex
 
         if(!isempty(c))
         {
-            const clipplanes &p = getclipplanes(c, lo, lsize);
+            const clipplanes &p = getclipplanes(c, lo, lsize, false, 1);
             float f = 0;
             if(raycubeintersect(p, c, v, ray, invray, f) && (dist+f>0 || !(mode&RAY_SKIPFIRST)))
                 return min(dent, dist+f);
@@ -335,7 +340,7 @@ float shadowray(const vec &o, const vec &ray, float radius, int mode, extentity 
         if(!isempty(c) && !(c.material&MAT_ALPHA))
         {
             if(isentirelysolid(c)) return c.texture[side]==DEFAULT_SKY && mode&RAY_SKIPSKY ? radius : dist;
-            const clipplanes &p = getclipplanes(c, lo, 1<<lshift);
+            const clipplanes &p = getclipplanes(c, lo, 1<<lshift, false, 1);
             INTERSECTPLANES(side = p.side[i], goto nextcube);
             INTERSECTBOX(side = (i<<1) + 1 - lsizemask[i], goto nextcube);
             if(exitdist >= 0) return c.texture[side]==DEFAULT_SKY && mode&RAY_SKIPSKY ? radius : dist+max(enterdist+0.1f, 0.0f);
@@ -357,7 +362,7 @@ struct ShadowRayCache
     clipplanes clipcache[MAXCLIPPLANES];
     int version;
 
-    ShadowRayCache() : version(0) {}
+    ShadowRayCache() : version(-1) {}
 };
 
 ShadowRayCache *newshadowraycache() { return new ShadowRayCache; }
@@ -366,7 +371,12 @@ void freeshadowraycache(ShadowRayCache *&cache) { delete cache; cache = NULL; }
 
 void resetshadowraycache(ShadowRayCache *cache) 
 { 
-    if(!cache->version++) memset(cache->clipcache, 0, sizeof(cache->clipcache));
+    cache->version++;
+    if(!cache->version)
+    {
+        memset(cache->clipcache, 0, sizeof(cache->clipcache));
+        cache->version = 1;
+    }
 }
 
 float shadowray(ShadowRayCache *cache, const vec &o, const vec &ray, float radius, int mode, extentity *t)
@@ -386,7 +396,7 @@ float shadowray(ShadowRayCache *cache, const vec &o, const vec &ray, float radiu
         {
             if(isentirelysolid(c)) return c.texture[side]==DEFAULT_SKY && mode&RAY_SKIPSKY ? radius : dist;
             clipplanes &p = cache->clipcache[int(&c - worldroot)&(MAXCLIPPLANES-1)];
-            if(p.owner != &c || p.version != cache->version) { p.owner = &c; p.version = cache->version; genclipplanes(c, lo.x, lo.y, lo.z, 1<<lshift, p); }
+            if(p.owner != &c || p.version != cache->version) { p.owner = &c; p.version = cache->version; genclipplanes(c, lo.x, lo.y, lo.z, 1<<lshift, p, false); }
             INTERSECTPLANES(side = p.side[i], goto nextcube);
             INTERSECTBOX(side = (i<<1) + 1 - lsizemask[i], goto nextcube);
             if(exitdist >= 0) return c.texture[side]==DEFAULT_SKY && mode&RAY_SKIPSKY ? radius : dist+max(enterdist+0.1f, 0.0f);
@@ -1502,7 +1512,7 @@ bool move(physent *d, vec &dir)
     return !collided;
 }
 
-bool bounce(physent *d, float secs, float elasticity, float waterfric, physent *safe)
+bool bounce(physent *d, float secs, float elasticity, float waterfric, float grav, physent *safe)
 {
     // make sure bouncers don't start inside geometry
     if(d->physstate!=PHYS_BOUNCE && !collide(d, vec(0, 0, 0), 0, false))
@@ -1526,10 +1536,10 @@ bool bounce(physent *d, float secs, float elasticity, float waterfric, physent *
     bool water = isliquid(mat);
     if(water)
     {
-        d->vel.z -= GRAVITY/16*secs;
+        d->vel.z -= grav*GRAVITY/16*secs;
         d->vel.mul(max(1.0f - secs/waterfric, 0.0f));
     }
-    else d->vel.z -= GRAVITY*secs;
+    else d->vel.z -= grav*GRAVITY*secs;
     vec old(d->o);
     loopi(2)
     {
@@ -1931,8 +1941,7 @@ void physicsframe()          // optimally schedule physics frames inside the gra
     if(diff <= 0) physsteps = 0;
     else
     {
-        extern int gamespeed;
-        physframetime = clamp((PHYSFRAMETIME*gamespeed)/100, 1, PHYSFRAMETIME);
+        physframetime = clamp(game::scaletime(PHYSFRAMETIME)/100, 1, PHYSFRAMETIME);
         physsteps = (diff + physframetime - 1)/physframetime;
         lastphysframe += physsteps * physframetime;
     }
@@ -1973,7 +1982,7 @@ void moveplayer(physent *pl, int moveres, bool local)
     }
 }
 
-bool bounce(physent *d, float elasticity, float waterfric, physent *safe)
+bool bounce(physent *d, float elasticity, float waterfric, float grav, physent *safe)
 {
     if(physsteps <= 0)
     {
@@ -1985,10 +1994,10 @@ bool bounce(physent *d, float elasticity, float waterfric, physent *safe)
     bool hitplayer = false;
     loopi(physsteps-1)
     {
-        if(bounce(d, physframetime/1000.0f, elasticity, waterfric, safe)) hitplayer = true;
+        if(bounce(d, physframetime/1000.0f, elasticity, waterfric, grav, safe)) hitplayer = true;
     }
     d->deltapos = d->o;
-    if(bounce(d, physframetime/1000.0f, elasticity, waterfric, safe)) hitplayer = true;
+    if(bounce(d, physframetime/1000.0f, elasticity, waterfric, grav, safe)) hitplayer = true;
     d->newpos = d->o;
     d->deltapos.sub(d->newpos);
     interppos(d);

@@ -38,6 +38,8 @@ namespace game
     extern void changemap(const char *name);
     extern void forceedit(const char *name);
     extern bool ispaused();
+    extern int scaletime(int t);
+    extern bool allowmouselook();
 
     extern const char *gameident();
     extern const char *savedconfig();
@@ -70,6 +72,7 @@ namespace game
     extern int numdynents();
     extern void rendergame();
     extern void renderavatar();
+    extern void renderplayerpreview(int model, int team, int weap);
     extern void writegamedata(vector<char> &extras);
     extern void readgamedata(vector<char> &extras);
     extern int clipconsole(int w, int h);
@@ -115,5 +118,6 @@ namespace server
     extern int masterport();
     extern void processmasterinput(const char *cmd, int cmdlen, const char *args);
     extern bool ispaused();
+    extern int scaletime(int t);
 }
 

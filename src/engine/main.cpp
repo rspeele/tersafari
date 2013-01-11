@@ -881,16 +881,12 @@ void swapbuffers()
     SDL_GL_SwapBuffers();
 }
  
-VARF(gamespeed, 10, 100, 1000, if(multiplayer()) gamespeed = 100);
-
-VARF(paused, 0, 0, 1, if(multiplayer()) paused = 0);
-
 VAR(menufps, 0, 60, 1000);
 VARP(maxfps, 0, 200, 1000);
 
 void limitfps(int &millis, int curmillis)
 {
-    int limit = mainmenu && menufps ? (maxfps ? min(maxfps, menufps) : menufps) : maxfps;
+    int limit = (mainmenu || minimized) && menufps ? (maxfps ? min(maxfps, menufps) : menufps) : maxfps;
     if(!limit) return;
     static int fpserror = 0;
     int delay = 1000/limit - (millis-curmillis);
@@ -1033,6 +1029,8 @@ int getclockmillis()
     return max(millis, totalmillis);
 }
 
+VAR(numcpus, 1, 1, 16);
+
 int main(int argc, char **argv)
 {
     #ifdef WIN32
@@ -1075,7 +1073,7 @@ int main(int argc, char **argv)
                 if(dir) logoutf("Adding package directory: %s", dir);
                 break;
             }
-            case 'g': logoutf("Setting log file", &argv[i][2]); setlogfile(&argv[i][2]); break;
+            case 'g': logoutf("Setting log file: %s", &argv[i][2]); setlogfile(&argv[i][2]); break;
             case 'd': dedicated = atoi(&argv[i][2]); if(dedicated<=0) dedicated = 2; break;
             case 'w': scr_w = clamp(atoi(&argv[i][2]), SCR_MINW, SCR_MAXW); if(!findarg(argc, argv, "-h")) scr_h = -1; break;
             case 'h': scr_h = clamp(atoi(&argv[i][2]), SCR_MINH, SCR_MAXH); if(!findarg(argc, argv, "-w")) scr_w = -1; break;
@@ -1100,6 +1098,8 @@ int main(int argc, char **argv)
         else gameargs.add(argv[i]);
     }
     initing = NOT_INITING;
+
+    numcpus = clamp(guessnumcpus(), 1, 16);
 
     if(dedicated <= 1)
     {
@@ -1228,19 +1228,14 @@ int main(int argc, char **argv)
         int millis = getclockmillis();
         limitfps(millis, totalmillis);
         int elapsed = millis-totalmillis;
-        if(multiplayer(false)) curtime = game::ispaused() ? 0 : elapsed;
-        else
-        {
-            static int timeerr = 0;
-            int scaledtime = elapsed*gamespeed + timeerr;
-            curtime = scaledtime/100;
-            timeerr = scaledtime%100;
-            if(curtime>200) curtime = 200;
-            if(paused || game::ispaused()) curtime = 0;
-        }
+        static int timeerr = 0;
+        int scaledtime = game::scaletime(elapsed) + timeerr;
+        curtime = scaledtime/100;
+        timeerr = scaledtime%100;
+        if(!multiplayer(false) && curtime>200) curtime = 200;
+        if(game::ispaused()) curtime = 0;
         lastmillis += curtime;
         totalmillis = millis;
-        extern void updatetime();
         updatetime();
  
         checkinput();

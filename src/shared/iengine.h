@@ -125,6 +125,7 @@ extern ident *newident(const char *name, int flags = 0);
 extern ident *readident(const char *name);
 extern ident *writeident(const char *name, int flags = 0);
 extern bool addcommand(const char *name, identfun fun, const char *narg);
+extern bool addkeyword(int type, const char *name);
 extern uint *compilecode(const char *p);
 extern void keepcode(uint *p);
 extern void freecode(uint *p);
@@ -147,6 +148,12 @@ extern bool validateblock(const char *s);
 extern void explodelist(const char *s, vector<char *> &elems, int limit = -1);
 extern char *indexlist(const char *s, int pos);
 extern int listlen(const char *s);
+extern void printvar(ident *id);
+extern void printvar(ident *id, int i);
+extern void printfvar(ident *id, float f);
+extern void printsvar(ident *id, const char *s);
+extern int clampvar(ident *id, int i, int minval, int maxval);
+extern float clampfvar(ident *id, float f, float minval, float maxval);
 
 // console
 
@@ -160,15 +167,15 @@ enum
     CON_ECHO  = 1<<5
 };
 
-extern void conoutf(const char *s, ...);
-extern void conoutf(int type, const char *s, ...);
+extern void conoutf(const char *s, ...) PRINTFARGS(1, 2);
+extern void conoutf(int type, const char *s, ...) PRINTFARGS(2, 3);
 extern void conoutfv(int type, const char *fmt, va_list args);
 
 extern FILE *getlogfile();
 extern void setlogfile(const char *fname);
 extern void closelogfile();
 extern void logoutfv(const char *fmt, va_list args);
-extern void logoutf(const char *fmt, ...);
+extern void logoutf(const char *fmt, ...) PRINTFARGS(1, 2);
 
 // menus
 extern vec menuinfrontofplayer();
@@ -207,7 +214,7 @@ extern void renderentsphere(const extentity &e, float radius);
 extern void renderentring(const extentity &e, float radius, int axis = 0);
 
 // main
-extern void fatal(const char *s, ...);
+extern void fatal(const char *s, ...) PRINTFARGS(1, 2);
 extern void keyrepeat(bool on);
 
 // rendertext
@@ -216,7 +223,7 @@ extern void pushfont();
 extern bool popfont();
 extern void gettextres(int &w, int &h);
 extern void draw_text(const char *str, int left, int top, int r = 255, int g = 255, int b = 255, int a = 255, int cursor = -1, int maxwidth = -1);
-extern void draw_textf(const char *fstr, int left, int top, ...);
+extern void draw_textf(const char *fstr, int left, int top, ...) PRINTFARGS(1, 4);
 extern float text_widthf(const char *str);
 extern void text_boundsf(const char *str, float &width, float &height, int maxwidth = -1);
 extern int text_visible(const char *str, float hitx, float hity, int maxwidth);
@@ -325,8 +332,8 @@ extern bool loadents(const char *fname, vector<entity> &ents, uint *crc = NULL);
 extern void moveplayer(physent *pl, int moveres, bool local);
 extern bool moveplayer(physent *pl, int moveres, bool local, int curtime);
 extern bool collide(physent *d, const vec &dir = vec(0, 0, 0), float cutoff = 0.0f, bool playercol = true, physent *safe = NULL);
-extern bool bounce(physent *d, float secs, float elasticity, float waterfric, physent *safe = NULL);
-extern bool bounce(physent *d, float elasticity, float waterfric, physent *safe = NULL);
+extern bool bounce(physent *d, float secs, float elasticity, float waterfric, float grav, physent *safe = NULL);
+extern bool bounce(physent *d, float elasticity, float waterfric, float grav, physent *safe = NULL);
 extern void avoidcollision(physent *d, const vec &dir, physent *obstacle, float space);
 extern bool overlapsdynent(const vec &o, float radius);
 extern bool movecamera(physent *pl, const vec &dir, float dist, float stepdist);
@@ -343,8 +350,15 @@ extern bool entinmap(dynent *d, bool avoidplayers = false);
 extern void findplayerspawn(dynent *d, int forceent = -1, int tag = 0);
 
 // sound
-extern int playsound(int n, const vec *loc = NULL, extentity *ent = NULL, int loops = 0, int fade = 0, int chanid = -1, int radius = 0, int expire = -1);
-extern int playsoundname(const char *s, const vec *loc = NULL, int vol = 0, int loops = 0, int fade = 0, int chanid = -1, int radius = 0, int expire = -1);
+enum
+{
+    SND_MAP = 1<<0
+};
+
+extern int playsound(int n, const vec *loc = NULL, extentity *ent = NULL, int flags = 0, int loops = 0, int fade = 0, int chanid = -1, int radius = 0, int expire = -1);
+extern int playsoundname(const char *s, const vec *loc = NULL, int vol = 0, int flags = 0, int loops = 0, int fade = 0, int chanid = -1, int radius = 0, int expire = -1);
+extern void preloadsound(int n);
+extern void preloadmapsound(int n);
 extern bool stopsound(int n, int chanid, int fade = 0);
 extern void stopsounds();
 extern void initsound();
@@ -374,7 +388,7 @@ extern void setbbfrommodel(dynent *d, const char *mdl);
 extern const char *mapmodelname(int i);
 extern model *loadmodel(const char *name, int i = -1, bool msg = false);
 extern void preloadmodel(const char *name);
-extern void flushpreloadedmodels();
+extern void flushpreloadedmodels(bool msg = true);
 
 // ragdoll
 
@@ -387,7 +401,7 @@ extern void cleanragdoll(dynent *d);
 
 extern int maxclients;
 
-enum { DISC_NONE = 0, DISC_EOP, DISC_LOCAL, DISC_KICK, DISC_TAGT, DISC_IPBAN, DISC_PRIVATE, DISC_MAXCLIENTS, DISC_TIMEOUT, DISC_OVERFLOW, DISC_PASSWORD, DISC_NUM };
+enum { DISC_NONE = 0, DISC_EOP, DISC_LOCAL, DISC_KICK, DISC_MSGERR, DISC_IPBAN, DISC_PRIVATE, DISC_MAXCLIENTS, DISC_TIMEOUT, DISC_OVERFLOW, DISC_PASSWORD, DISC_NUM };
 
 extern void *getclientinfo(int i);
 extern ENetPeer *getclientpeer(int i);
@@ -398,23 +412,6 @@ extern void flushserver(bool force);
 extern int getservermtu();
 extern int getnumclients();
 extern uint getclientip(int n);
-extern void putint(ucharbuf &p, int n);
-extern void putint(packetbuf &p, int n);
-extern void putint(vector<uchar> &p, int n);
-extern int getint(ucharbuf &p);
-extern void putuint(ucharbuf &p, int n);
-extern void putuint(packetbuf &p, int n);
-extern void putuint(vector<uchar> &p, int n);
-extern int getuint(ucharbuf &p);
-extern void putfloat(ucharbuf &p, float f);
-extern void putfloat(packetbuf &p, float f);
-extern void putfloat(vector<uchar> &p, float f);
-extern float getfloat(ucharbuf &p);
-extern void sendstring(const char *t, ucharbuf &p);
-extern void sendstring(const char *t, packetbuf &p);
-extern void sendstring(const char *t, vector<uchar> &p);
-extern void getstring(char *t, ucharbuf &p, int len = MAXTRANS);
-extern void filtertext(char *dst, const char *src, bool whitespace = true, int len = sizeof(string)-1);
 extern void localconnect();
 extern const char *disconnectreason(int reason);
 extern void disconnect_client(int n, int reason);
@@ -423,7 +420,7 @@ extern bool hasnonlocalclients();
 extern bool haslocalclients();
 extern void sendserverinforeply(ucharbuf &p);
 extern bool requestmaster(const char *req);
-extern bool requestmasterf(const char *fmt, ...);
+extern bool requestmasterf(const char *fmt, ...) PRINTFARGS(1, 2);
 extern bool isdedicatedserver();
 
 // client
@@ -463,19 +460,19 @@ struct g3d_gui
     virtual void end() = 0;
 
     virtual int text(const char *text, int color, const char *icon = NULL) = 0;
-    int textf(const char *fmt, int color, const char *icon = NULL, ...)
+    int textf(const char *fmt, int color, const char *icon = NULL, ...) PRINTFARGS(2, 5)
     {
         defvformatstring(str, icon, fmt);
         return text(str, color, icon);
     }
     virtual int button(const char *text, int color, const char *icon = NULL) = 0;
-    int buttonf(const char *fmt, int color, const char *icon = NULL, ...)
+    int buttonf(const char *fmt, int color, const char *icon = NULL, ...) PRINTFARGS(2, 5)
     {
         defvformatstring(str, icon, fmt);
         return button(str, color, icon);
     }
     virtual int title(const char *text, int color, const char *icon = NULL) = 0;
-    int titlef(const char *fmt, int color, const char *icon = NULL, ...)
+    int titlef(const char *fmt, int color, const char *icon = NULL, ...) PRINTFARGS(2, 5)
     {
         defvformatstring(str, icon, fmt);
         return title(str, color, icon);
@@ -490,6 +487,8 @@ struct g3d_gui
 	virtual void tab(const char *name = NULL, int color = 0) = 0;
     virtual int image(Texture *t, float scale, bool overlaid = false) = 0;
     virtual int texture(VSlot &vslot, float scale, bool overlaid = true) = 0;
+    virtual int playerpreview(int model, int team, int weap, float scale, bool overlaid = false) { return 0; }
+    virtual int modelpreview(const char *name, int anim, float scale, bool overlaid = false) { return 0; }
     virtual void slider(int &val, int vmin, int vmax, int color, const char *label = NULL) = 0;
     virtual void separator() = 0;
 	virtual void progress(float percent) = 0;
