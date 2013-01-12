@@ -343,7 +343,7 @@ namespace game
         if(thirdperson)
         {
             defformatstring(ds)("%d", damage);
-            particle_textcopy(d->abovehead(), ds, PART_TEXT, 2000, color, 4.0f, -8);
+            particle_textcopy(d->abovehead(), ds, PART_TEXT, 2000, color, 5.0f, -8, 1024);
         }
     }
 

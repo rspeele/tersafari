@@ -319,7 +319,7 @@ namespace game
             damageblend(damage);
             damagecompass(damage, actor->o);
         }
-        damageeffect(damage, d, d!=h);
+        else if(actor==h) damageeffect(damage, d, d!=h);
 
 		ai::damaged(d, actor);
 
