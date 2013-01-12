@@ -338,10 +338,12 @@ namespace game
         vec p = d->o;
         p.z += 0.6f*(d->eyeheight + d->aboveeye) - d->eyeheight;
         if(blood) particle_splash(PART_BLOOD, damage/10, 1000, p, 0x60FFFF, 2.96f);
+        static const int dmgcolors[] = { 0x00FFFF, 0x7FFF7F, 0xFFFF00, 0xFF7F00, 0xFF3F3F };
+        const int color = dmgcolors[min((uint)damage / 20, sizeof(dmgcolors) / sizeof(int) - 1)];
         if(thirdperson)
         {
             defformatstring(ds)("%d", damage);
-            particle_textcopy(d->abovehead(), ds, PART_TEXT, 2000, 0xFF4B19, 4.0f, -8);
+            particle_textcopy(d->abovehead(), ds, PART_TEXT, 2000, color, 4.0f, -8);
         }
     }
 
