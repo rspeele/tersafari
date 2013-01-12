@@ -399,7 +399,7 @@ namespace game
         }
         else
         {
-            if(d==player1) conoutf(contype, "\f2%s got fragged by %s%s%s", dname, aname, with, gname);
+            if(d==player1) conoutf(contype, "\f2%s got fragged by %s @ %dhp%s%s", dname, aname, actor->health, with, gname);
             else conoutf(contype, "\f2%s fragged %s%s%s", aname, dname, with, gname);
         }
         deathstate(d);
