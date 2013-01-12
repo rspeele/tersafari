@@ -323,6 +323,11 @@ void guispring(int *weight)
     if(cgui) cgui->spring(max(*weight, 1));
 }
 
+void guicolumn(int *col)
+{
+    if(cgui) cgui->column(*col);
+}
+
 template<class T> static void updateval(char *var, T val, char *onchange)
 {
     ident *id = writeident(var);
@@ -534,12 +539,12 @@ void newgui(char *name, char *contents, char *header, char *init)
 
 menu *guiserversmenu = NULL;
 
-void guiservers(uint *header)
+void guiservers(uint *header, int *pagemin, int *pagemax)
 {
-    extern char *showservers(g3d_gui *cgui, uint *header);
+    extern char *showservers(g3d_gui *cgui, uint *header, int pagemin, int pagemax);
     if(cgui) 
     {
-        char *command = showservers(cgui, header);
+        char *command = showservers(cgui, header, *pagemin, *pagemax > 0 ? *pagemax : INT_MAX);
         if(command)
         {
             updatelater.add().schedule(command);
@@ -561,7 +566,7 @@ void notifywelcome()
 COMMAND(newgui, "ssss");
 COMMAND(guibutton, "sss");
 COMMAND(guitext, "ss");
-COMMAND(guiservers, "e");
+COMMAND(guiservers, "eii");
 ICOMMAND(cleargui, "i", (int *n), intret(cleargui(*n)));
 COMMAND(showgui, "s");
 COMMAND(hidegui, "s");
@@ -575,6 +580,7 @@ COMMAND(guititle, "s");
 COMMAND(guibar,"");
 COMMAND(guistrut,"fi");
 COMMAND(guispring, "i");
+COMMAND(guicolumn, "i");
 COMMAND(guiimage,"ssfis");
 COMMAND(guislider,"sbbs");
 COMMAND(guilistslider, "sss");
