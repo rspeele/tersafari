@@ -357,7 +357,7 @@ namespace game
 
     VARP(teamcolorfrags, 0, 1, 1);
 
-    void killed(fpsent *d, fpsent *actor)
+    void killed(fpsent *d, fpsent *actor, int gun)
     {
         if(d->state==CS_EDITING)
         {
@@ -382,19 +382,25 @@ namespace game
             dname = colorname(d, NULL, "", "", "you");
             aname = colorname(actor, NULL, "", "", "you");
         }
+        const char *with = "", *gname = "";
+        if (gun > 0 && gun < NUMGUNS)
+        {
+            with = " with ";
+            gname = guns[gun].name;
+        }
         if(d==actor)
             conoutf(contype, "\f2%s suicided%s", dname, d==player1 ? "!" : "");
         else if(isteam(d->team, actor->team))
         {
             contype |= CON_TEAMKILL;
-            if(actor==player1) conoutf(contype, "\f6%s fragged a teammate (%s)", aname, dname);
-            else if(d==player1) conoutf(contype, "\f6%s got fragged by a teammate (%s)", dname, aname);
-            else conoutf(contype, "\f2%s fragged a teammate (%s)", aname, dname);
+            if(actor==player1) conoutf(contype, "\f6%s fragged a teammate (%s)%s%s", aname, dname, with, gname);
+            else if(d==player1) conoutf(contype, "\f6%s got fragged by a teammate (%s)%s%s", dname, aname, with, gname);
+            else conoutf(contype, "\f2%s fragged a teammate (%s)%s%s", aname, dname, with, gname);
         }
         else
         {
-            if(d==player1) conoutf(contype, "\f2%s got fragged by %s", dname, aname);
-            else conoutf(contype, "\f2%s fragged %s", aname, dname);
+            if(d==player1) conoutf(contype, "\f2%s got fragged by %s%s%s", dname, aname, with, gname);
+            else conoutf(contype, "\f2%s fragged %s%s%s", aname, dname, with, gname);
         }
         deathstate(d);
 		ai::killed(d, actor);

@@ -1451,6 +1451,7 @@ namespace game
                 int vcn = getint(p), acn = getint(p), frags = getint(p), tfrags = getint(p);
                 fpsent *victim = getclient(vcn),
                        *actor = getclient(acn);
+                int gun = getint(p);
                 if(!actor) break;
                 actor->frags = frags;
                 if(m_teammode) setteaminfo(actor->team, tfrags);
@@ -1460,7 +1461,7 @@ namespace game
                     particle_textcopy(actor->abovehead(), ds, PART_TEXT, 2000, 0x32FF64, 4.0f, -8);
                 }
                 if(!victim) break;
-                killed(victim, actor);
+                killed(victim, actor, gun);
                 break;
             }
 
