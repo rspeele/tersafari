@@ -1814,7 +1814,8 @@ namespace server
                 putint(p, oi->state.state);
                 putint(p, oi->state.frags);
                 putint(p, oi->state.flags);
-                putint(p, oi->state.quadmillis);
+                putint(p, oi->state.quad.millis);
+                putint(p, oi->state.boost.millis);
                 sendstate(oi->state, p);
             }
             putint(p, -1);
@@ -1839,12 +1840,12 @@ namespace server
     void sendresume(clientinfo *ci)
     {
         gamestate &gs = ci->state;
-        sendf(-1, 1, "ri3i9vi", N_RESUME, ci->clientnum,
-            gs.state, gs.frags, gs.flags, gs.quadmillis,
-            gs.lifesequence,
-            gs.health, gs.maxhealth,
-            gs.armour, gs.armourtype,
-            gs.gunselect, GUN_PISTOL-GUN_SG+1, &gs.ammo[GUN_SG], -1);
+        sendf(-1, 1, "ri4i9vi", N_RESUME, ci->clientnum,
+              gs.state, gs.frags, gs.flags, gs.quad.millis, gs.boost.millis,
+              gs.lifesequence,
+              gs.health, gs.maxhealth,
+              gs.armour, gs.armourtype,
+              gs.gunselect, GUN_PISTOL-GUN_SG+1, &gs.ammo[GUN_SG], -1);
     }
 
     void sendinitclient(clientinfo *ci)
@@ -2143,7 +2144,7 @@ namespace server
             if(dup) continue;
 
             int damage = guns[gun].damage;
-            if(gs.quadmillis) damage *= 4;
+            if(gs.quad.millis) damage *= 4;
             damage = int(damage*(1-h.dist/EXP_DISTSCALE/guns[gun].exprad));
             if(target==ci) damage /= EXP_SELFDAMDIV;
             dodamage(target, ci, damage, gun, h.dir);
@@ -2166,7 +2167,7 @@ namespace server
                 int(from.x*DMF), int(from.y*DMF), int(from.z*DMF),
                 int(to.x*DMF), int(to.y*DMF), int(to.z*DMF),
                 ci->ownernum);
-        gs.shotdamage += guns[gun].damage*(gs.quadmillis ? 4 : 1)*guns[gun].rays;
+        gs.shotdamage += guns[gun].damage*(gs.quad.millis ? 4 : 1)*guns[gun].rays;
         switch(gun)
         {
             case GUN_RL: gs.rockets.add(id); break;
@@ -2183,7 +2184,7 @@ namespace server
                     totalrays += h.rays;
                     if(totalrays>maxrays) continue;
                     int damage = gun == GUN_CG ? cgdamage(target->state.o.dist(gs.o)) : h.rays*guns[gun].damage;
-                    if(gs.quadmillis) damage *= 4;
+                    if(gs.quad.millis) damage *= 4;
                     dodamage(target, ci, damage, gun, h.dir);
                 }
                 break;
@@ -2245,7 +2246,7 @@ namespace server
         loopv(clients)
         {
             clientinfo *ci = clients[i];
-            if(curtime>0 && ci->state.quadmillis) ci->state.quadmillis = max(ci->state.quadmillis-curtime, 0);
+            ci->state.updatepowerup(curtime);
             flushevents(ci, gamemillis);
         }
     }
@@ -2269,6 +2270,32 @@ namespace server
         }
         while(ci->events.length() > keep) delete ci->events.pop();
         ci->timesync = false;
+    }
+
+    void booststate::start(fpsstate *s)
+    {
+        millis = 30000;
+        nextboost = 0;
+        s->maxhealth = 150;
+    }
+    void booststate::end(fpsstate *s)
+    {
+        powerstate::end(s);
+        s->maxhealth = 100;
+    }
+    bool booststate::update(int curtime, fpsstate *s)
+    {
+        bool over = powerstate::update(curtime, s);
+        if (millis)
+        {
+            nextboost -= curtime;
+            if (nextboost <= 0)
+            {
+                s->health = min(s->maxhealth, s->health + 5);
+                nextboost = 750;
+            }
+        }
+        return over;
     }
 
     void serverupdate()

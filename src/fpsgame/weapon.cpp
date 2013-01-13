@@ -269,7 +269,7 @@ namespace game
             {
                 if(bnc.bouncetype==BNC_GRENADE)
                 {
-                    int qdam = guns[GUN_GL].damage*(bnc.owner->quadmillis ? 4 : 1);
+                    int qdam = guns[GUN_GL].damage*(bnc.owner->quad.millis ? 4 : 1);
                     hits.setsize(0);
                     explode(bnc.local, bnc.owner, bnc.o, NULL, qdam, GUN_GL);
                     adddecal(DECAL_SCORCH, bnc.o, vec(0, 0, 1), guns[GUN_GL].exprad/2);
@@ -530,7 +530,7 @@ namespace game
         {
             projectile &p = projs[i];
             p.offsetmillis = max(p.offsetmillis-time, 0);
-            int qdam = guns[p.gun].damage*(p.owner->quadmillis ? 4 : 1);
+            int qdam = guns[p.gun].damage*(p.owner->quad.millis ? 4 : 1);
             vec v;
             float dist = p.to.dist(p.o, v);
             float dtime = dist*1000/p.speed;
@@ -674,7 +674,7 @@ namespace game
                 playsound(sound, d==hudplayer() ? NULL : &d->o);
                 break;
         }
-        if(d->quadmillis && lastmillis-prevaction>200 && !looped) playsound(S_ITEMPUP, d==hudplayer() ? NULL : &d->o);
+        if(d->quad.millis && lastmillis-prevaction>200 && !looped) playsound(S_ITEMPUP, d==hudplayer() ? NULL : &d->o);
     }
 
     void particletrack(physent *owner, vec &o, vec &d)
@@ -739,7 +739,7 @@ namespace game
     void raydamage(vec &from, vec &to, fpsent *d)
     {
         int qdam = guns[d->gunselect].damage;
-        if(d->quadmillis) qdam *= 4;
+        if(d->quad.millis) qdam *= 4;
         dynent *o;
         float dist;
         if(guns[d->gunselect].rays > 1)
@@ -766,7 +766,7 @@ namespace game
         }
         else if((o = intersectclosest(from, to, d, dist)))
         {
-            if(d->gunselect == GUN_CG) qdam = server::cgdamage(d->o.dist(o->o)) * (d->quadmillis ? 4 : 1);
+            if(d->gunselect == GUN_CG) qdam = server::cgdamage(d->o.dist(o->o)) * (d->quad.millis ? 4 : 1);
             shorten(from, to, dist);
             hitpush(qdam, o, d, from, to, d->gunselect, 1);
         }
@@ -829,7 +829,7 @@ namespace game
 
 		d->gunwait = guns[d->gunselect].attackdelay;
 		if(d->gunselect == GUN_PISTOL && d->ai) d->gunwait += int(d->gunwait*(((101-d->skill)+rnd(111-d->skill))/100.f));
-        d->totalshots += guns[d->gunselect].damage*(d->quadmillis ? 4 : 1)*guns[d->gunselect].rays;
+        d->totalshots += guns[d->gunselect].damage*(d->quad.millis ? 4 : 1)*guns[d->gunselect].rays;
     }
 
     void adddynlights()

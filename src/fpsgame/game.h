@@ -316,8 +316,8 @@ static struct itemstat { int add, max, sound; const char *name; int icon, info; 
     {5,     15,    S_ITEMAMMO,   "RI", HICON_RIFLE, GUN_RIFLE},
     {10,    30,    S_ITEMAMMO,   "GL", HICON_GL, GUN_GL},
     {30,    120,   S_ITEMAMMO,   "PI", HICON_PISTOL, GUN_PISTOL},
-    {25,    100,   S_ITEMHEALTH, "H", HICON_HEALTH},
-    {10,    1000,  S_ITEMHEALTH, "MH", HICON_HEALTH},
+    {25,    100,   S_ITEMHEALTH, "H",  HICON_HEALTH},
+    {30000, 60000, S_ITEMHEALTH, "MH", HICON_HEALTH},
     {75,    150,   S_ITEMARMOUR, "GA", HICON_GREEN_ARMOUR, A_GREEN},
     {150,   200,   S_ITEMARMOUR, "YA", HICON_YELLOW_ARMOUR, A_YELLOW},
     {20000, 30000, S_ITEMPUP,    "Q", HICON_QUAD},
@@ -346,17 +346,66 @@ static const struct guninfo { int sound, attackdelay, damage, spread, projspeed,
 
 #include "ai.h"
 
+struct fpsstate;
+namespace server
+{
+    struct powerstate
+    {
+        int millis;
+        virtual void start(fpsstate *s)
+        {
+            millis = 20000;
+        }
+        virtual void end(fpsstate *s)
+        {
+            millis = 0;
+        }
+        virtual bool update(int curtime, fpsstate *s)
+        {
+            if(curtime > 0 && millis)
+            {
+                millis = max(millis - curtime, 0);
+                if (!millis) 
+                {
+                    end(s);
+                    return true;
+                }
+            }
+            return false;
+        }
+    };
+
+    struct quadstate : powerstate
+    {
+    };
+    struct booststate : powerstate
+    {
+        int nextboost;
+        void start(fpsstate *s);
+        void end(fpsstate *s);
+        bool update(int curtime, fpsstate *s);
+    };
+}
+
 // inherited by fpsent and server clients
 struct fpsstate
 {
     int health, maxhealth;
     int armour, armourtype;
-    int quadmillis;
     int gunselect, gunwait;
     int ammo[NUMGUNS];
     int aitype, skill;
 
+    server::quadstate quad;
+    server::booststate boost;
+
     fpsstate() : maxhealth(100), aitype(AI_NONE), skill(0) {}
+
+    void updatepowerup(int curtime)
+    {
+        quad.update(curtime, this);
+        boost.update(curtime, this);
+    }
 
     void baseammo(int gun, int k = 2, int scale = 1)
     {
@@ -381,13 +430,13 @@ struct fpsstate
         itemstat &is = itemstats[type-I_SHELLS];
         switch(type)
         {
-            case I_BOOST: return maxhealth<is.max;
             case I_HEALTH: return health<maxhealth;
             case I_GREENARMOUR:
                 // (100h/100g only absorbs 200 damage)
                 if(armourtype==A_YELLOW && armour>=100) return false;
             case I_YELLOWARMOUR: return !armourtype || armour<is.max;
-            case I_QUAD: return quadmillis<is.max;
+            case I_BOOST:
+            case I_QUAD: return true;
             default: return ammo[is.info]<is.max;
         }
     }
@@ -399,7 +448,8 @@ struct fpsstate
         switch(type)
         {
             case I_BOOST:
-                maxhealth = min(maxhealth+is.add, is.max);
+                boost.start(this);
+                break;
             case I_HEALTH: // boost also adds to health
                 health = min(health+is.add, maxhealth);
                 break;
@@ -409,7 +459,7 @@ struct fpsstate
                 armourtype = is.info;
                 break;
             case I_QUAD:
-                quadmillis = min(quadmillis+is.add, is.max);
+                quad.start(this);
                 break;
             default:
                 ammo[is.info] = min(ammo[is.info]+is.add, is.max);
@@ -419,10 +469,11 @@ struct fpsstate
 
     void respawn()
     {
+        quad.end(this);
+        boost.end(this);
         health = maxhealth;
         armour = 0;
         armourtype = A_BLUE;
-        quadmillis = 0;
         gunselect = GUN_PISTOL;
         gunwait = 0;
         loopi(NUMGUNS) ammo[i] = 0;
@@ -502,6 +553,7 @@ struct fpsstate
         return gun >= 0 && gun <= NUMGUNS && gun != exclude && ammo[gun] > 0;
     }
 };
+
 
 struct fpsent : dynent, fpsstate
 {
@@ -620,7 +672,7 @@ namespace entities
     extern void preloadentities();
     extern void renderentities();
     extern void checkitems(fpsent *d);
-    extern void checkquad(int time, fpsent *d);
+    extern void checkpowerup(int time, fpsent *d);
     extern void resetspawns();
     extern void spawnitems(bool force = false);
     extern void putitems(packetbuf &p);

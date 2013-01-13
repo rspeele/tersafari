@@ -443,7 +443,7 @@ struct collectclientmode : clientmode
     {
         if(d->state == CS_ALIVE && d->tokens > 0)
         {
-            int x = HICON_X + 3*HICON_STEP + (d->quadmillis ? HICON_SIZE + HICON_SPACE : 0);
+            int x = HICON_X + 3*HICON_STEP + (d->quad.millis ? HICON_SIZE + HICON_SPACE : 0);
             glPushMatrix();
             glScalef(2, 2, 1);
             draw_textf("%d", (x + HICON_SIZE + HICON_SPACE)/2, HICON_TEXTY/2, d->tokens);

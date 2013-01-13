@@ -192,7 +192,7 @@ namespace game
             else if(!intermission)
             {
                 if(lastmillis - d->lastaction >= d->gunwait) d->gunwait = 0;
-                if(d->quadmillis) entities::checkquad(curtime, d);
+                entities::checkpowerup(curtime, d);
             }
 
             const int lagtime = totalmillis-d->lastupdate;
@@ -220,7 +220,7 @@ namespace game
         ai::navigate();
         if(player1->state != CS_DEAD && !intermission)
         {
-            if(player1->quadmillis) entities::checkquad(curtime, player1);
+            entities::checkpowerup(curtime, player1);
         }
         updateweapons(curtime);
         otherplayers(curtime);
@@ -774,7 +774,7 @@ namespace game
         {
             if(d->armour) drawicon(HICON_BLUE_ARMOUR+d->armourtype, HICON_X + HICON_STEP, HICON_Y);
             drawicon(HICON_FIST+d->gunselect, HICON_X + 2*HICON_STEP, HICON_Y);
-            if(d->quadmillis) drawicon(HICON_QUAD, HICON_X + 3*HICON_STEP, HICON_Y);
+            if(d->quad.millis) drawicon(HICON_QUAD, HICON_X + 3*HICON_STEP, HICON_Y);
             if(ammohud) drawammohud(d);
         }
     }

@@ -161,7 +161,7 @@ namespace entities
         if(d==player1) switch(type)
         {
             case I_BOOST:
-                conoutf(CON_GAMEINFO, "\f2you have a permanent +10 health bonus! (%d)", d->maxhealth);
+                conoutf(CON_GAMEINFO, "\f2you have boosted health!");
                 playsound(S_V_BOOST, NULL, NULL, 0, 0, 0, -1, 0, 3000);
                 break;
 
@@ -329,13 +329,17 @@ namespace entities
         }
     }
 
-    void checkquad(int time, fpsent *d)
+    void checkpowerup(int time, fpsent *d)
     {
-        if(d->quadmillis && (d->quadmillis -= time)<=0)
+        if (d->quad.update(time, d))
         {
-            d->quadmillis = 0;
             playsound(S_PUPOUT, d==player1 ? NULL : &d->o);
             if(d==player1) conoutf(CON_GAMEINFO, "\f2quad damage is over");
+        }
+        if (d->boost.update(time, d))
+        {
+            playsound(S_PUPOUT, d==player1 ? NULL : &d->o);
+            if(d==player1) conoutf(CON_GAMEINFO, "\f2health boost is over");
         }
     }
 

@@ -156,7 +156,7 @@ namespace game
         }
         if(d->state==CS_ALIVE)
         {
-            if((testquad || d->quadmillis) && mdl.quad)
+            if((testquad || d->quad.millis) && mdl.quad)
                 a[ai++] = modelattach("tag_powerup", mdl.quad, ANIM_POWERUP|ANIM_LOOP, 0);
             if(testarmour || d->armour)
             {

@@ -1136,8 +1136,16 @@ namespace game
             else d->state = getint(p);
             d->frags = getint(p);
             d->flags = getint(p);
-            if(d==player1) getint(p);
-            else d->quadmillis = getint(p);
+            if(d==player1)
+            {
+                getint(p);
+                getint(p);
+            }
+            else
+            {
+                d->quad.millis = getint(p);
+                d->boost.millis = getint(p);
+            }
         }
         d->lifesequence = getint(p);
         d->health = getint(p);
@@ -1419,6 +1427,7 @@ namespace game
                 explodeeffects(gun, e, false, id);
                 break;
             }
+
             case N_DAMAGE:
             {
                 int tcn = getint(p),
