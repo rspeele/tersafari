@@ -324,8 +324,12 @@ namespace game
 		ai::damaged(d, actor);
 
         if(d->health<=0) { if(local) killed(d, actor); }
-        else if(d==h) playsound(S_PAIN6);
-        else playsound(S_PAIN1+rnd(5), &d->o);
+        else if (lastmillis - d->lastyelp >= 800)
+        {
+            if(d==h) playsound(S_PAIN6);
+            else playsound(S_PAIN1+rnd(5), &d->o);
+            d->lastyelp = lastmillis;
+        }
     }
 
     VARP(deathscore, 0, 1, 1);

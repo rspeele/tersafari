@@ -391,13 +391,17 @@ namespace game
             if(at==player1)
             {
                 damageeffect(damage, f);
-                if(f==player1)
+                if (lastmillis - player1->lastyelp >= 800)
                 {
-                    damageblend(damage);
-                    damagecompass(damage, at ? at->o : f->o);
-                    playsound(S_PAIN6);
+                    if(f==player1)
+                    {
+                        damageblend(damage);
+                        damagecompass(damage, at ? at->o : f->o);
+                        playsound(S_PAIN6);
+                    }
+                    else playsound(S_PAIN1+rnd(5), &f->o);
+                    player1->lastyelp = lastmillis;
                 }
-                else playsound(S_PAIN1+rnd(5), &f->o);
             }
         }
     }
