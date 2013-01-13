@@ -2419,6 +2419,7 @@ VARP(wallclocksecs, 0, 0, 1);
 
 static time_t walltime = 0;
 
+VARP(showspeed, 0, 1, 1);
 VARP(showfps, 0, 1, 1);
 VARP(showfpsrange, 0, 0, 1);
 VAR(showeditstats, 0, 0, 1);
@@ -2461,6 +2462,11 @@ void gl_drawhud(int w, int h)
             glScalef(conscale, conscale, 1);
 
             int roffset = 0;
+            if(showspeed)
+            {
+                int speed = (int)camera1->vel.magnitude2();
+                draw_textf("%3d ups", conw-5*FONTH, conh-FONTH*6/2, speed);
+            }
             if(showfps)
             {
                 static int lastfps = 0, prevfps[3] = { 0, 0, 0 }, curfps[3] = { 0, 0, 0 };
