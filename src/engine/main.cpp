@@ -887,16 +887,27 @@ namespace rawinput
                             buffer,
                             &size,
                             sizeof(RAWINPUTHEADER));
-        if(actual != size) return -2;
-        RAWINPUT *raw = (RAWINPUT*)buffer;
-        switch (raw->header.dwType)
+        int retval;
+        if(actual != size)
         {
-        case RIM_TYPEMOUSE:
-            mouseevent(&raw->data.mouse);
-            return 0;
-        default:
-            return 1;
+            retval = -2;
         }
+        else
+        {
+            RAWINPUT *raw = (RAWINPUT*)buffer;
+            switch (raw->header.dwType)
+            {
+            case RIM_TYPEMOUSE:
+                mouseevent(&raw->data.mouse);
+                retval = 0;
+                break;
+            default:
+                retval = 1;
+                break;
+            }
+        }
+        free(buffer);
+        return retval;
     }
 
     int registermouse(RAWINPUTDEVICE *rid)
