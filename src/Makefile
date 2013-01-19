@@ -69,6 +69,7 @@ CLIENT_OBJS= \
 	engine/octarender.o \
 	engine/physics.o \
 	engine/pvs.o \
+	engine/raw.o \
 	engine/rendergl.o \
 	engine/renderlights.o \
 	engine/rendermodel.o \
@@ -133,7 +134,7 @@ all: client server
 
 enet/Makefile:
 	cd enet; ./configure --enable-shared=no --enable-static=yes
-	
+
 libenet: enet/Makefile
 	$(MAKE)	-C enet/ all
 
@@ -177,7 +178,7 @@ client:	libenet $(CLIENT_OBJS)
 
 server:	libenet $(SERVER_OBJS)
 	$(CXX) $(CXXFLAGS) -o tess_server $(SERVER_OBJS) $(SERVER_LIBS)  
-	
+
 master: libenet $(MASTER_OBJS)
 	$(CXX) $(CXXFLAGS) -o tess_master $(MASTER_OBJS) $(MASTER_LIBS)  
 
@@ -310,6 +311,7 @@ engine/pvs.o: engine/engine.h shared/cube.h shared/tools.h shared/geom.h
 engine/pvs.o: shared/ents.h shared/command.h shared/iengine.h shared/igame.h
 engine/pvs.o: engine/world.h engine/octa.h engine/light.h engine/bih.h
 engine/pvs.o: engine/texture.h engine/model.h engine/varray.h
+engine/raw.o: engine/engine.h shared/tools.h shared/geom.h
 engine/rendergl.o: engine/engine.h shared/cube.h shared/tools.h shared/geom.h
 engine/rendergl.o: shared/ents.h shared/command.h shared/iengine.h
 engine/rendergl.o: shared/igame.h engine/world.h engine/octa.h engine/light.h

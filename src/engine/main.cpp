@@ -6,6 +6,7 @@ extern void cleargamma();
 
 void cleanup()
 {
+    rawinput::release();
     recorder::stop();
     cleanupserver();
     SDL_ShowCursor(1);
@@ -820,204 +821,12 @@ static void checkmousemotion(int &dx, int &dy)
     }
 }
 
-VAR(debugrawmouse, 0, 0, 1);
-
-namespace rawinput
-{
-    int enable(int on);
-#ifdef WIN32
-#include<windows.h>
-#include"SDL_syswm.h"
-    void mouseevent(RAWMOUSE *ev)
-    {
-        if(debugrawmouse) conoutf("raw mouse event (%2ld, %2ld) (flags 0x%04lx) (button 0x%04lx)", ev->lLastX, ev->lLastY, (ULONG)ev->usFlags, (ULONG)ev->usButtonFlags);
-        if((ev->usFlags & MOUSE_MOVE_RELATIVE) == MOUSE_MOVE_RELATIVE)
-        {
-            int dx = ev->lLastX, dy = ev->lLastY;
-            if(!g3d_movecursor(dx, dy)) mousemove(dx, dy);
-        }
-        static const Uint8 sdlButtons[] =
-            {
-                SDL_BUTTON_LEFT,
-                SDL_BUTTON_MIDDLE,
-                SDL_BUTTON_RIGHT,
-                SDL_BUTTON_X1,
-                SDL_BUTTON_X2
-            };
-        static const USHORT winButtonsDown[] =
-            {
-                RI_MOUSE_LEFT_BUTTON_DOWN,
-                RI_MOUSE_MIDDLE_BUTTON_DOWN,
-                RI_MOUSE_RIGHT_BUTTON_DOWN,
-                RI_MOUSE_BUTTON_4_DOWN,
-                RI_MOUSE_BUTTON_5_DOWN
-            };
-        static const USHORT winButtonsUp[] =
-            {
-                RI_MOUSE_LEFT_BUTTON_UP,
-                RI_MOUSE_MIDDLE_BUTTON_UP,
-                RI_MOUSE_RIGHT_BUTTON_UP,
-                RI_MOUSE_BUTTON_4_UP,
-                RI_MOUSE_BUTTON_5_UP
-            };
-        for (uint i = 0; i < sizeof(sdlButtons) / sizeof(Uint8); i++)
-        {
-            if(ev->usButtonFlags & winButtonsDown[i]) keypress(-sdlButtons[i], true, 0);
-            if(ev->usButtonFlags & winButtonsUp[i]) keypress(-sdlButtons[i], false, 0);
-        }
-    }
-
-    int readmouse(LPARAM lParam)
-    {
-        UINT size;
-        // get expected size
-        GetRawInputData((HRAWINPUT)lParam,
-                        RID_INPUT,
-                        NULL,
-                        &size,
-                        sizeof(RAWINPUTHEADER));
-        if (size == 0) return -1;
-        // allocate buffer
-        LPBYTE buffer = (LPBYTE)malloc(sizeof(BYTE) * size);
-        if (!buffer) return 1;
-        // read into buffer
-        UINT actual =
-            GetRawInputData((HRAWINPUT)lParam,
-                            RID_INPUT,
-                            buffer,
-                            &size,
-                            sizeof(RAWINPUTHEADER));
-        int retval;
-        if(actual != size)
-        {
-            retval = -2;
-        }
-        else
-        {
-            RAWINPUT *raw = (RAWINPUT*)buffer;
-            switch (raw->header.dwType)
-            {
-            case RIM_TYPEMOUSE:
-                mouseevent(&raw->data.mouse);
-                retval = 0;
-                break;
-            default:
-                retval = 1;
-                break;
-            }
-        }
-        free(buffer);
-        return retval;
-    }
-
-    int registermouse(RAWINPUTDEVICE *rid)
-    {
-        rid->usUsagePage = 0x01;
-        rid->usUsage = 0x02; // mouse
-        rid->dwFlags = RIDEV_NOLEGACY;
-        rid->hwndTarget = 0;
-        return (RegisterRawInputDevices(rid, 1, sizeof(*rid)) == FALSE);
-    }
-
-    int unregistermouse(RAWINPUTDEVICE *rid)
-    {
-        rid->dwFlags = RIDEV_REMOVE;
-        return (RegisterRawInputDevices(rid, 1, sizeof(*rid)) == FALSE);
-    }
-
-    static WNDPROC oldwndproc = NULL;
-
-    LRESULT CALLBACK mousewnd(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
-    {
-        if(msg==WM_INPUT)
-        {
-            int read = readmouse(lparam);
-            if(read < 0) conoutf(CON_ERROR, "got bad raw input message (mismatched size)");
-        }
-        if(!oldwndproc)
-        {
-            conoutf(CON_ERROR, "something is very wrong (old wndproc lost)");
-            return 1;
-        }
-        else
-        {
-            return CallWindowProc(oldwndproc, hwnd, msg, wparam, lparam);
-        }
-    }
-
-    HWND gethwnd()
-    {
-        SDL_SysWMinfo info;
-        SDL_VERSION(&info.version);
-        switch(SDL_GetWMInfo(&info))
-        {
-        case -1:
-            conoutf(CON_ERROR, "failed to get window handle");
-        case 0:
-            conoutf(CON_ERROR, "no support for system window manager information");
-            return NULL;
-        default:
-            return info.window;
-        }
-    }
-
-    static RAWINPUTDEVICE mousedev;
-
-    int enable(int on)
-    {
-        static int current = 0;
-        if (current == on) return current;
-        HWND handle = gethwnd();
-        if(!handle) return current;
-        if(on)
-        {
-            if(registermouse(&mousedev))
-            {
-                conoutf(CON_ERROR, "failed to register raw input device");
-                return current;
-            }
-            if(oldwndproc == NULL)
-            {
-                oldwndproc = (WNDPROC)
-                    SetWindowLongPtr(handle,
-                                     GWLP_WNDPROC,
-                                     (LONG_PTR)mousewnd);
-            }
-        }
-        else
-        {
-            if(unregistermouse(&mousedev))
-            {
-                conoutf(CON_ERROR, "failed to unregister raw input device");
-                return current;
-            }
-            if(oldwndproc != NULL)
-            {
-                SetWindowLongPtr(handle,
-                                 GWLP_WNDPROC,
-                                 (LONG_PTR)oldwndproc);
-                oldwndproc = NULL;
-            }
-        }
-        current = on;
-        return current;
-    }
-#else
-    int enable(int on)
-    {
-        if(on) conoutf(CON_INFO, "raw input is not supported on this system");
-        return 0;
-    }
-#endif
-}
-
-VARFP(rawmouse, 0, 0, 1, {rawmouse = rawinput::enable(rawmouse);});
-
 void checkinput()
 {
     SDL_Event event;
     int lasttype = 0, lastbut = 0;
-    bool mousemoved = false; 
+    bool mousemoved = false;
+    if(rawinput::enabled) rawinput::flush();
     while(events.length() || pollevent(event))
     {
         if(events.length()) event = events.remove(0);
@@ -1047,9 +856,12 @@ void checkinput()
                 break;
 
             case SDL_MOUSEMOTION:
-                if(debugrawmouse) conoutf("sdl mouse event (%2d, %2d)",
-                                          event.motion.xrel, event.motion.yrel);
-                if(grabinput && !rawmouse)
+                if(rawinput::debugrawmouse)
+                {
+                    conoutf("%d sdl mouse event (%2d, %2d)",
+                            lastmillis, event.motion.xrel, event.motion.yrel);
+                }
+                if(grabinput && !rawinput::enabled)
                 {
                     int dx = event.motion.xrel, dy = event.motion.yrel;
                     checkmousemotion(dx, dy);
@@ -1060,9 +872,13 @@ void checkinput()
 
             case SDL_MOUSEBUTTONDOWN:
             case SDL_MOUSEBUTTONUP:
-                if(debugrawmouse) conoutf("sdl mouse event (button 0x%02x) (state %d)",
-                                          event.button.button, event.button.state);
-                if(rawmouse || (lasttype==event.type && lastbut==event.button.button)) break; // why?? get event twice without it
+                if(rawinput::debugrawmouse)
+                {
+                    conoutf("sdl mouse event (button 0x%02x) (state %d)",
+                            event.button.button, event.button.state);
+                }
+                // avoid doubled events by checking against last type/button
+                if(rawinput::enabled || (lasttype==event.type && lastbut==event.button.button)) break;
                 keypress(-event.button.button, event.button.state!=0, 0);
                 lasttype = event.type;
                 lastbut = event.button.button;

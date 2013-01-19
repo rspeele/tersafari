@@ -4,7 +4,7 @@ namespace rawinput
     bool enabled = false;
     VAR(debugrawmouse, 0, 0, 1);
     SVARFP(rawmouse, "", { pick(rawmouse); });
-    ICOMMAND(listrawdevices, "", (), listdevices());
+//    ICOMMAND(listrawdevices, "", (), listdevices());
     // event interface common to raw input systems
     // provides a thread-safe buffered event system
     enum
@@ -137,99 +137,178 @@ namespace rawinput
 ////////////////////////////////////////////////////////////////////////////////
 #include<windows.h>
 #include"SDL_syswm.h"
-    void listdevices()
+    struct windev
     {
-    }
-    void mouseevent(RAWMOUSE *ev)
+        HANDLE device;
+        DWORD type;
+        string name;
+    };
+    // open registry key corresponding to device name as returned from GetRawInputDeviceInfo
+    // return true on successful open
+    bool opendevicekey(char *name, HKEY *handle)
     {
-        if(debugrawmouse) conoutf("raw mouse event (%2ld, %2ld) (flags 0x%04lx) (button 0x%04lx)", ev->lLastX, ev->lLastY, (ULONG)ev->usFlags, (ULONG)ev->usButtonFlags);
-        if((ev->usFlags & MOUSE_MOVE_RELATIVE) == MOUSE_MOVE_RELATIVE)
+        // convert name to a registry path for the device
+        static char path[0x200];
+        const char *base = "SYSTEM\\CurrentControlSet\\Enum\\";
+        // skip leading '?' and '\\' chars
+        while(*name && (*name == '\\' || *name == '?')) name++;
+        // copy base path
+        uint i, k, p;
+        for(i = 0; base[i] && i < sizeof(path); i++) path[i] = base[i];
+        // copy name, converting '#' characters to '\\' and stopping at 3rd '#' character
+        for(k = 0, p = 0; name[k] && i < sizeof(path); ++i && ++k)
         {
-            int dx = ev->lLastX, dy = ev->lLastY;
-            if(!g3d_movecursor(dx, dy)) mousemove(dx, dy);
+            char c = name[k];
+            if(c == '#')
+            {
+                if(++p > 2) break;
+                path[i] = '\\';
+            }
+            else path[i] = c;
         }
-        static const Uint8 sdlButtons[] =
-            {
-                SDL_BUTTON_LEFT,
-                SDL_BUTTON_MIDDLE,
-                SDL_BUTTON_RIGHT,
-                SDL_BUTTON_X1,
-                SDL_BUTTON_X2
-            };
-        static const USHORT winButtonsDown[] =
-            {
-                RI_MOUSE_LEFT_BUTTON_DOWN,
-                RI_MOUSE_MIDDLE_BUTTON_DOWN,
-                RI_MOUSE_RIGHT_BUTTON_DOWN,
-                RI_MOUSE_BUTTON_4_DOWN,
-                RI_MOUSE_BUTTON_5_DOWN
-            };
-        static const USHORT winButtonsUp[] =
-            {
-                RI_MOUSE_LEFT_BUTTON_UP,
-                RI_MOUSE_MIDDLE_BUTTON_UP,
-                RI_MOUSE_RIGHT_BUTTON_UP,
-                RI_MOUSE_BUTTON_4_UP,
-                RI_MOUSE_BUTTON_5_UP
-            };
-        for (uint i = 0; i < sizeof(sdlButtons) / sizeof(Uint8); i++)
+        // sentinel
+        path[i] = '\0';
+        LONG open
+            = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+                           path,
+                           0,
+                           KEY_READ,
+                           handle);
+        return open == ERROR_SUCCESS;
+    }
+    // fill in info from registry for a windev, dev.device must be set
+    void loadregistryinfo(windev &dev)
+    {
+        *dev.name = '\0';
+        static string rawname;
+        UINT rawlen = sizeof(rawname);
+        UINT tryinfo = GetRawInputDeviceInfo(dev.device, RIDI_DEVICENAME, &rawname, &rawlen);
+        if(tryinfo == (UINT)-1) return;
+        HKEY regkey;
+        if(!opendevicekey(rawname, &regkey)) return;
+        DWORD regtype;
+        ULONG size = sizeof(dev.name);
+        RegQueryValueExA(regkey, "DeviceDesc", NULL, &regtype, (LPBYTE)dev.name, &size);
+        RegCloseKey(regkey);
+        if(size > 0) dev.name[size-1] = '\0';
+    }
+    // returns no. of devices listed
+    int listdevices(vector<windev> &devs, bool (*filter)(windev &))
+    {
+        devs.setsize(0);
+        PRAWINPUTDEVICELIST rids;
+        UINT numrids, trylist;
+        trylist = GetRawInputDeviceList(NULL, &numrids, sizeof(RAWINPUTDEVICELIST));
+        if(trylist == (UINT)-1) return -1;
+        rids = new RAWINPUTDEVICELIST[numrids];
+        if(!rids) return -1;
+        trylist = GetRawInputDeviceList(rids, &numrids, sizeof(RAWINPUTDEVICELIST));
+        if(trylist == (UINT)-1)
         {
-            if(ev->usButtonFlags & winButtonsDown[i]) addevent(rawevent(REV_BUTTON, -sdlButtons[i], 1));
-            if(ev->usButtonFlags & winButtonsUp[i]) addevent(rawevent(REV_BUTTON, -sdlButtons[i], 0));
+            delete[] rids;
+            return -1;
+        }
+        windev candidate;
+        loopi(numrids)
+        {
+            candidate.device = rids[i].hDevice;
+            candidate.type = rids[i].dwType;
+            loadregistryinfo(candidate);
+            if(filter(candidate)) devs.add(candidate);
+        }
+        return numrids;
+    }
+#define USAGE_PAGE_GENERIC_DESKTOP 0x01
+#define USAGE_MOUSE 0x02
+#define USAGE_KEYBOARD 0x06
+    // true on successful (un)registration
+    bool registerdevice(DWORD usage, HWND window, DWORD flags)
+    {
+        RAWINPUTDEVICE rid;
+        rid.usUsagePage = USAGE_PAGE_GENERIC_DESKTOP;
+        rid.usUsage = usage;
+        rid.dwFlags = flags;
+        rid.hwndTarget = window;
+        return (RegisterRawInputDevices(&rid, 1, sizeof(rid)) == TRUE);
+    }
+
+    struct buttonmap
+    {
+        USHORT windown;
+        USHORT winup;
+        int translate;
+    };
+#define WINBUTTON(x) RI_MOUSE_##x##_DOWN, RI_MOUSE_##x##_UP
+    static const buttonmap lookup[] =
+    { { WINBUTTON(LEFT_BUTTON), -SDL_BUTTON_LEFT },
+      { WINBUTTON(RIGHT_BUTTON), -SDL_BUTTON_RIGHT },
+      { WINBUTTON(MIDDLE_BUTTON), -SDL_BUTTON_MIDDLE },
+      { WINBUTTON(BUTTON_4), -SDL_BUTTON_X1 },
+      { WINBUTTON(BUTTON_5), -SDL_BUTTON_X2 }
+    };
+    static const int numbuttons = sizeof(lookup) / sizeof(buttonmap);
+
+    // add events to queue from a RAWMOUSE event
+    void handlemouse(RAWMOUSE &ev)
+    {
+        if((ev.usFlags & MOUSE_MOVE_RELATIVE) == MOUSE_MOVE_RELATIVE)
+        {
+            if(!g3d_movecursor(ev.lLastX, ev.lLastY)) mousemove(ev.lLastX, ev.lLastY);
+        }
+        for (int i = 0; i < numbuttons; i++)
+        {
+            if(ev.usButtonFlags & lookup[i].windown) addevent(rawevent(REV_BUTTON, lookup[i].translate, 1));
+            else if(ev.usButtonFlags & lookup[i].winup) addevent(rawevent(REV_BUTTON, lookup[i].translate, 0));
         }
     }
 
-    int readmouse(LPARAM lParam)
+    // chosen devices
+    static vector<windev> devices;
+    // return true if raw input was handled
+    bool readrawinput(LPARAM lparam)
     {
         RAWINPUT raw;
-        UINT size = sizeof(RAWINPUT);
+        UINT size = sizeof(raw);
+        // read into buffer
         UINT read =
-            GetRawInputData((HRAWINPUT)lParam,
+            GetRawInputData((HRAWINPUT)lparam,
                             RID_INPUT,
                             &raw,
                             &size,
                             sizeof(RAWINPUTHEADER));
-        if(read)
+        if(read == (UINT)-1)
         {
-            if(read < 0) return -2; // read failed
-            else if(read!=size) return -1; // read succeeded but wrong size
-            else if(raw.header.dwType == RIM_TYPEMOUSE) mouseevent(&raw.data.mouse);
+            conoutf(CON_ERROR, "failed to read raw input data");
+            return false;
         }
-        return 0;
-    }
-
-    int registermouse(RAWINPUTDEVICE *rid)
-    {
-        rid->usUsagePage = 0x01;
-        rid->usUsage = 0x02; // mouse
-        rid->dwFlags = RIDEV_NOLEGACY;
-        rid->hwndTarget = 0;
-        return (RegisterRawInputDevices(rid, 1, sizeof(*rid)) == FALSE);
-    }
-
-    int unregistermouse(RAWINPUTDEVICE *rid)
-    {
-        rid->dwFlags = RIDEV_REMOVE;
-        return (RegisterRawInputDevices(rid, 1, sizeof(*rid)) == FALSE);
-    }
-
-    static WNDPROC oldwndproc = NULL;
-
-    LRESULT CALLBACK mousewnd(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
-    {
-        if(msg==WM_INPUT)
+        if(read > size || read < sizeof(RAWINPUTHEADER))
         {
-            int read = readmouse(lparam);
-            if(read < 0) conoutf(CON_ERROR, "got bad raw input message (mismatched size)");
+            conoutf(CON_ERROR, "bad size for raw input data (%d)\n", read);
+            return false;
         }
-        if(!oldwndproc)
+        if(raw.header.dwType != RIM_TYPEMOUSE) return false;
+        bool care = false;
+        loopv(devices) if(devices[i].device == raw.header.hDevice)
         {
-            conoutf(CON_ERROR, "something is very wrong (old wndproc lost)");
-            return 1;
+            care = true;
+            break;
+        }
+        if(care) handlemouse(raw.data.mouse);
+        return care;
+    }
+
+    static WNDPROC basewndproc = NULL;
+    LRESULT CALLBACK rawwndproc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
+    {
+        if(msg==WM_INPUT) readrawinput(lparam);
+        if(!basewndproc)
+        {
+            conoutf(CON_ERROR, "!!! something is very wrong (base wndproc missing) !!!");
+            return DefWindowProc(hwnd, msg, wparam, lparam);
         }
         else
         {
-            return CallWindowProc(oldwndproc, hwnd, msg, wparam, lparam);
+            return CallWindowProc(basewndproc, hwnd, msg, wparam, lparam);
         }
     }
 
@@ -249,65 +328,41 @@ namespace rawinput
         }
     }
 
-    static RAWINPUTDEVICE mousedev;
+    bool namefilter(windev &dev)
+    {
+        bool use = strstr(dev.name, rawmouse);
+        if(use) conoutf("Listening to raw device %s", dev.name);
+        return use;
+    }
 
     int os_pick(const char *name)
     {
-        if(enabled) return 1;
+        if(enabled) return devices.length();
+        int count = listdevices(devices, namefilter);
+        if(!count) return 0;
         HWND handle = gethwnd();
-        if(registermouse(&mousedev)) return 0;
-        if(oldwndproc == NULL)
+        if(!handle) return 0;
+        if(registerdevice(USAGE_MOUSE, handle, RIDEV_NOLEGACY))
         {
-            oldwndproc = (WNDPROC)
-                SetWindowLongPtr(handle,
-                                 GWLP_WNDPROC,
-                                 (LONG_PTR)mousewnd);
+            basewndproc = (WNDPROC)SetWindowLongPtr(handle, GWLP_WNDPROC, (LONG_PTR)rawwndproc);
+            return count;
         }
-        return 1;
+        devices.setsize(0);
+        return 0;
     }
     void os_release()
     {
-        if(!enabled) return;
         HWND handle = gethwnd();
-        if(unregistermouse(&mousedev))
+        if(!handle) return;
+        if(!registerdevice(USAGE_MOUSE, handle, RIDEV_REMOVE))
         {
-            conoutf(CON_ERROR, "failed to unregister raw input device");
+            conoutf(CON_ERROR, "failed to unregister raw mouse");
             return;
         }
-        if(oldwndproc != NULL)
+        if(basewndproc != NULL)
         {
-            SetWindowLongPtr(handle,
-                             GWLP_WNDPROC,
-                             (LONG_PTR)oldwndproc);
-            oldwndproc = NULL;
+            if(SetWindowLongPtr(handle, GWLP_WNDPROC, (LONG_PTR)basewndproc)) basewndproc = NULL;
         }
-    }
-    int enable(int on)
-    {
-        static int current = 0;
-        if (current == on) return current;
-        HWND handle = gethwnd();
-        if(!handle) return current;
-        if(on)
-        {
-            if(registermouse(&mousedev))
-            {
-                conoutf(CON_ERROR, "failed to register raw input device");
-                return current;
-            }
-            if(oldwndproc == NULL)
-            {
-                oldwndproc = (WNDPROC)
-                    SetWindowLongPtr(handle,
-                                     GWLP_WNDPROC,
-                                     (LONG_PTR)mousewnd);
-            }
-        }
-        else
-        {
-        }
-        current = on;
-        return current;
     }
 #elif linux
 ////////////////////////////////////////////////////////////////////////////////
@@ -510,10 +565,6 @@ namespace rawinput
     }
     void os_release()
     {
-    }
-    void listdevices()
-    {
-        result("");
     }
 #endif
 }

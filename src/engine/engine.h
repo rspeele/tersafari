@@ -739,6 +739,15 @@ extern bool initwarning(const char *desc, int level = INIT_RESET, int type = CHA
 
 extern bool grabinput, minimized;
 
+namespace rawinput
+{
+    extern bool enabled;
+    extern int debugrawmouse;
+    void pick(const char *name);
+    void release();
+    void flush();
+}
+
 extern void pushevent(const SDL_Event &e);
 extern bool interceptkey(int sym);
 
