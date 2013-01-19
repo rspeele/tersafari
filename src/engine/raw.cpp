@@ -251,10 +251,6 @@ namespace rawinput
         }
         return devs.length();
     }
-#define USAGE_PAGE_GENERIC_DESKTOP 0x01
-#define USAGE_MOUSE 0x02
-#define USAGE_KEYBOARD 0x06
-
     struct buttonmap
     {
         USHORT windown;
@@ -374,7 +370,9 @@ namespace rawinput
         rid.hwndTarget = NULL;
         return (RegisterRawInputDevices(&rid, 1, sizeof(RAWINPUTDEVICE)) == TRUE);
     }
-
+#define USAGE_PAGE_GENERIC_DESKTOP 0x01
+#define USAGE_MOUSE 0x02
+#define USAGE_KEYBOARD 0x06
     int os_pick(const char *name)
     {
         if(enabled) return devices.length();
