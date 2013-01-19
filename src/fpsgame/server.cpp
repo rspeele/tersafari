@@ -58,7 +58,7 @@ namespace server
 
     struct shotevent : timedevent
     {
-        int id, gun;
+        int id, gun, charge;
         vec from, to;
         vector<hitinfo> hits;
 
@@ -2163,7 +2163,7 @@ namespace server
         if(gun!=GUN_FIST) gs.ammo[gun]--;
         gs.lastshot = millis;
         gs.gunwait = guns[gun].attackdelay;
-        sendf(-1, 1, "rii9x", N_SHOTFX, ci->clientnum, gun, id,
+        sendf(-1, 1, "ri2i9x", N_SHOTFX, ci->clientnum, gun, charge, id,
                 int(from.x*DMF), int(from.y*DMF), int(from.z*DMF),
                 int(to.x*DMF), int(to.y*DMF), int(to.z*DMF),
                 ci->ownernum);
@@ -2991,6 +2991,7 @@ namespace server
                 shot->id = getint(p);
                 shot->millis = cq ? cq->geteventmillis(gamemillis, shot->id) : 0;
                 shot->gun = getint(p);
+                shot->charge = getint(p);
                 loopk(3) shot->from[k] = getint(p)/DMF;
                 loopk(3) shot->to[k] = getint(p)/DMF;
                 int hits = getint(p);

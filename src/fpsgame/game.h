@@ -233,7 +233,7 @@ static const int msgsizes[] =               // size inclusive message token, 0 f
 {
     N_CONNECT, 0, N_SERVINFO, 0, N_WELCOME, 1, N_INITCLIENT, 0, N_POS, 0, N_TEXT, 0, N_SOUND, 2, N_CDIS, 2,
     N_SHOOT, 0, N_EXPLODE, 0, N_SUICIDE, 1,
-    N_DIED, 6, N_DAMAGE, 6, N_HITPUSH, 7, N_SHOTFX, 10, N_EXPLODEFX, 4,
+    N_DIED, 6, N_DAMAGE, 6, N_HITPUSH, 7, N_SHOTFX, 11, N_EXPLODEFX, 4,
     N_TRYSPAWN, 1, N_SPAWNSTATE, 14, N_SPAWN, 3, N_FORCEDEATH, 2,
     N_GUNSELECT, 2, N_TAUNT, 1,
     N_MAPCHANGE, 0, N_MAPVOTE, 0, N_TEAMINFO, 0, N_ITEMSPAWN, 2, N_ITEMPICKUP, 2, N_ITEMACC, 3,
@@ -328,20 +328,20 @@ static struct itemstat { int add, max, sound; const char *name; int icon, info; 
 #define EXP_SELFPUSH 1.5f
 #define EXP_DISTSCALE 1.5f
 
-static const struct guninfo { int sound, attackdelay, damage, spread, projspeed, kickamount, range, rays, hitpush, exprad, ttl; const char *name, *file; short part; } guns[NUMGUNS] =
+static const struct guninfo { int sound, attackdelay, charge, damage, spread, projspeed, kickamount, range, rays, hitpush, exprad, ttl; const char *name, *file; } guns[NUMGUNS] =
 {
-    { S_PUNCH1,    250,  50,   0,   0,  0,   14,  1,  80,  0,    0, "fist",            "fist",   0 },
-    { S_SG,        800,   4, 100,   0,  0, 1024, 25,  80,  0,    0, "shotgun",         "shotg",  0 },
-    { S_CG,         75,  10,  20,   0,  0, 1024,  1,  80,  0,    0, "chaingun",        "chaing", 0 },
-    { S_RLFIRE,    800, 110,   0, 300,  0, 1024,  1, 170, 40,    0, "rocketlauncher",  "rocket", 0 },
-    { S_RIFLE,    1500,  90,   0,   0, 15, 2048,  1,  80,  0,    0, "rifle",           "rifle",  0 },
-    { S_FLAUNCH,   600,  90,   0, 200,  0, 1024,  1, 250, 45, 1500, "grenadelauncher", "gl",     0 },
-    { S_PISTOL,    500,  35,  20,   0,  0, 1024,  1,  80,  0,    0, "pistol",          "pistol", 0 },
-    { S_FLAUNCH,   200,  20,   0, 200,  1, 1024,  1,  80, 40,    0, "fireball",        NULL,     PART_FIREBALL1 },
-    { S_ICEBALL,   200,  40,   0, 120,  1, 1024,  1,  80, 40,    0, "iceball",         NULL,     PART_FIREBALL2 },
-    { S_SLIMEBALL, 200,  30,   0, 640,  1, 1024,  1,  80, 40,    0, "slimeball",       NULL,     PART_FIREBALL3 },
-    { S_PIGR1,     250,  50,   0,   0,  1,   12,  1,  80,  0,    0, "bite",            NULL,     0 },
-    { -1,            0, 120,   0,   0,  0,    0,  1,  80, 40,    0, "barrel",          NULL,     0 }
+    { S_PUNCH1,    250,    0,  50,   0,   0,  0,   14,  1,  80,  0,    0, "fist",            "fist"  },
+    { S_SG,        800,    0,   4, 100,   0,  0, 1024, 25,  80,  0,    0, "shotgun",         "shotg" },
+    { S_CG,         75,    0,  10,  20,   0,  0, 1024,  1,  80,  0,    0, "chaingun",        "chaing" },
+    { S_RLFIRE,    800,    0, 110,   0, 300,  0, 1024,  1, 170, 40,    0, "rocketlauncher",  "rocket" },
+    { S_RIFLE,    1500,    0,  90,   0,   0, 15, 2048,  1,  80,  0,    0, "rifle",           "rifle" },
+    { S_FLAUNCH,   900, 1500,  90,   0, 210,  0, 1024,  1, 250, 45,  600, "grenadelauncher", "gl" },
+    { S_PISTOL,    500,    0,  35,  20,   0,  0, 1024,  1,  80,  0,    0, "pistol",          "pistol" },
+    { S_FLAUNCH,   200,    0,  20,   0, 200,  1, 1024,  1,  80, 40,    0, "fireball",        NULL },
+    { S_ICEBALL,   200,    0,  40,   0, 120,  1, 1024,  1,  80, 40,    0, "iceball",         NULL },
+    { S_SLIMEBALL, 200,    0,  30,   0, 640,  1, 1024,  1,  80, 40,    0, "slimeball",       NULL },
+    { S_PIGR1,     250,    0,  50,   0,   0,  1,   12,  1,  80,  0,    0, "bite",            NULL },
+    { -1,            0,    0, 120,   0,   0,  0,    0,  1,  80, 40,    0, "barrel",          NULL }
 };
 
 #include "ai.h"
@@ -564,6 +564,7 @@ struct fpsent : dynent, fpsstate
     int lastpain;
     int lastyelp;
     int lastaction, lastattackgun;
+    int attackcharge;
     bool attacking;
     int attacksound, attackchan, idlesound, idlechan;
     int lasttaunt;
@@ -620,6 +621,7 @@ struct fpsent : dynent, fpsstate
         respawned = suicided = -1;
         lastaction = 0;
         lastattackgun = gunselect;
+        attackcharge = 0;
         attacking = false;
         lasttaunt = 0;
         lastpickup = -1;
@@ -774,7 +776,7 @@ namespace game
     // weapon
     extern int getweapon(const char *name);
     extern void shoot(fpsent *d, const vec &targ);
-    extern void shoteffects(int gun, const vec &from, const vec &to, fpsent *d, bool local, int id, int prevaction);
+    extern void shoteffects(int gun, const vec &from, const vec &to, fpsent *d, bool local, int id, int prevaction, int charge);
     extern void explode(bool local, fpsent *owner, const vec &v, dynent *safe, int dam, int gun);
     extern void explodeeffects(int gun, fpsent *d, bool local, int id = 0);
     extern void damageeffect(int damage, fpsent *d, bool thirdperson = true);

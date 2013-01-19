@@ -285,7 +285,14 @@ namespace game
         sway.z = swayup*(fabs(sinf(steps)) - 1);
         sway.add(swaydir).add(d->o);
         if(!hudgunsway) sway = d->o;
-
+        if(guns[d->gunselect].charge && d->attackcharge) // move hudgun back when charging
+        {
+            vec chargeoffset;
+            vecfromyawpitch(d->yaw, d->pitch, -1, 0, chargeoffset);
+            const float charge = (float)(lastmillis - d->attackcharge) / (float)guns[d->gunselect].charge;
+            chargeoffset.mul(charge * 0.8f);
+            sway.add(chargeoffset);
+        }
 #if 0
         if(player1->state!=CS_DEAD && player1->quadmillis)
         {

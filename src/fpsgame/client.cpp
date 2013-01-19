@@ -1403,7 +1403,7 @@ namespace game
 
             case N_SHOTFX:
             {
-                int scn = getint(p), gun = getint(p), id = getint(p);
+                int scn = getint(p), gun = getint(p), charge = getint(p), id = getint(p);
                 vec from, to;
                 loopk(3) from[k] = getint(p)/DMF;
                 loopk(3) to[k] = getint(p)/DMF;
@@ -1415,7 +1415,7 @@ namespace game
                 int prevaction = s->lastaction;
                 s->lastaction = lastmillis;
                 s->lastattackgun = s->gunselect;
-                shoteffects(s->gunselect, from, to, s, false, id, prevaction);
+                shoteffects(s->gunselect, from, to, s, false, id, prevaction, charge);
                 break;
             }
 

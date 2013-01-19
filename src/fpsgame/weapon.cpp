@@ -254,7 +254,7 @@ namespace game
             }
             vec old(bnc.o);
             bool stopped = false;
-            if(bnc.bouncetype==BNC_GRENADE) stopped = bounce(&bnc, 0.6f, 0.5f, 0.8f, bnc.owner) || (bnc.lifetime -= time)<0;
+            if(bnc.bouncetype==BNC_GRENADE) stopped = bounce(&bnc, 0.8f, 0.5f, 0.8f, bnc.owner) || (bnc.lifetime -= time)<0;
             else
             {
                 // cheaper variable rate physics for debris, gibs, etc.
@@ -464,17 +464,8 @@ namespace game
 
     void projsplash(projectile &p, vec &v, dynent *safe, int damage)
     {
-        if(guns[p.gun].part)
-        {
-            particle_splash(PART_SPARK, 100, 200, v, 0xB49B4B, 0.24f);
-            playsound(S_FEXPLODE, &v);
-            // no push?
-        }
-        else
-        {
-            explode(p.local, p.owner, v, safe, damage, GUN_RL);
-            adddecal(DECAL_SCORCH, v, vec(p.dir).neg(), guns[p.gun].exprad/2);
-        }
+        explode(p.local, p.owner, v, safe, damage, GUN_RL);
+        adddecal(DECAL_SCORCH, v, vec(p.dir).neg(), guns[p.gun].exprad/2);
     }
 
     void explodeeffects(int gun, fpsent *d, bool local, int id)
@@ -567,17 +558,7 @@ namespace game
                 {
                     vec pos(v);
                     pos.add(vec(p.offset).mul(p.offsetmillis/float(OFFSETMILLIS)));
-                    if(guns[p.gun].part)
-                    {
-                         regular_particle_splash(PART_SMOKE, 2, 300, pos, 0x404040, 0.6f, 150, -20);
-                         int color = 0xFFFFFF;
-                         switch(guns[p.gun].part)
-                         {
-                            case PART_FIREBALL1: color = 0xFFC8C8; break;
-                         }
-                         particle_splash(guns[p.gun].part, 1, 1, pos, color, 4.8f, 150, 20);
-                    }
-                    else regular_particle_splash(PART_SMOKE, 2, 300, pos, 0x404040, 2.4f, 50, -20);
+                    regular_particle_splash(PART_SMOKE, 2, 300, pos, 0x404040, 2.4f, 50, -20);
                 }
             }
             if(exploded)
@@ -596,7 +577,7 @@ namespace game
     VARP(muzzleflash, 0, 1, 1);
     VARP(muzzlelight, 0, 1, 1);
 
-    void shoteffects(int gun, const vec &from, const vec &to, fpsent *d, bool local, int id, int prevaction)     // create visual effect from a shot
+    void shoteffects(int gun, const vec &from, const vec &to, fpsent *d, bool local, int id, int prevaction, const int charge)     // create visual effect from a shot
     {
         int sound = guns[gun].sound, pspeed = 25;
         switch(gun)
@@ -646,11 +627,11 @@ namespace game
             {
                 float dist = from.dist(to);
                 vec up = to;
-                up.z += dist/8;
+                up.z += dist/4;
                 if(muzzleflash && d->muzzle.x >= 0)
                     particle_flare(d->muzzle, d->muzzle, 200, PART_MUZZLE_FLASH2, 0xFFFFFF, 1.5f, d);
                 if(muzzlelight) adddynlight(hudgunorigin(gun, d->o, to, d), 20, vec(1.0f, 0.75f, 0.5f), 100, 100, DL_FLASH, 0, vec(0, 0, 0), d);
-                newbouncer(from, up, local, id, d, BNC_GRENADE, guns[gun].ttl, guns[gun].projspeed);
+                newbouncer(from, up, local, id, d, BNC_GRENADE, guns[gun].ttl + charge, guns[gun].projspeed);
                 break;
             }
 
@@ -782,7 +763,17 @@ namespace game
         int prevaction = d->lastaction, attacktime = lastmillis-prevaction;
         if(attacktime<d->gunwait) return;
         d->gunwait = 0;
-        if((d==player1 || d->ai) && !d->attacking) return;
+        if(d==player1 || d->ai)
+        {
+            // if attacking with no existing charge, set charge
+            if(d->attacking && !d->attackcharge) d->attackcharge = lastmillis;
+            // if not attacking, and no charge, don't shoot
+            if(!d->attacking && !d->attackcharge) return;
+            // if attacking, but still charging, don't shoot
+            if(d->attacking && lastmillis - d->attackcharge < guns[d->gunselect].charge) return;
+        }
+        const int charge = d->attackcharge ? lastmillis - d->attackcharge : 0;
+        d->attackcharge = 0;
         d->lastaction = lastmillis;
         d->lastattackgun = d->gunselect;
         if(!d->ammo[d->gunselect])
@@ -821,11 +812,11 @@ namespace game
 
         if(!guns[d->gunselect].projspeed) raydamage(from, to, d);
 
-        shoteffects(d->gunselect, from, to, d, true, 0, prevaction);
+        shoteffects(d->gunselect, from, to, d, true, 0, prevaction, charge);
 
         if(d==player1 || d->ai)
         {
-            addmsg(N_SHOOT, "rci2i6iv", d, lastmillis-maptime, d->gunselect,
+            addmsg(N_SHOOT, "rci3i6iv", d, lastmillis-maptime, d->gunselect, charge,
                    (int)(from.x*DMF), (int)(from.y*DMF), (int)(from.z*DMF),
                    (int)(to.x*DMF), (int)(to.y*DMF), (int)(to.z*DMF),
                    hits.length(), hits.length()*sizeof(hitmsg)/sizeof(int), hits.getbuf());
