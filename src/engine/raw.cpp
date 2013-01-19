@@ -93,6 +93,7 @@ namespace rawinput
         SDL_UnlockMutex(bufferlock);
         return frontbuffer;
     }
+    // perform the corresponding game functions for a given raw event
     void processevent(rawevent &ev)
     {
         if(debugrawmouse)
@@ -118,7 +119,7 @@ namespace rawinput
             break;
         }
     }
-    // add an event to queue; completely thread-safe
+    // add an event to buffer
     void addevent(rawevent ev)
     {
 #ifdef REV_THREADSAFE
@@ -338,8 +339,7 @@ namespace rawinput
     bool namefilter(windev &dev)
     {
         if(dev.type != RIM_TYPEMOUSE) return false;
-        if(*rawmouse == '*') return true;
-        bool use = strstr(dev.name, rawmouse);
+        bool use = (*rawmouse == '*') || strstr(dev.name, rawmouse);
         if(use) conoutf("Listening to raw device %s", dev.name);
         return use;
     }
