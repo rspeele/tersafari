@@ -130,6 +130,21 @@ namespace rawinput
         processevent(ev);
 #endif
     }
+    // scrolling convenience
+    void addscroll(int delta)
+    {
+        for(int i = 0; i > delta; i--)
+        {
+            addevent(rawevent(REV_BUTTON, -SDL_BUTTON_WHEELDOWN, 1));
+            addevent(rawevent(REV_BUTTON, -SDL_BUTTON_WHEELDOWN, 0));
+        }
+        for(int i = 0; i < delta; i++)
+        {
+            addevent(rawevent(REV_BUTTON, -SDL_BUTTON_WHEELUP, 1));
+            addevent(rawevent(REV_BUTTON, -SDL_BUTTON_WHEELUP, 0));
+        }
+    }
+
     // process pending events, call this as part of main loop
     void flush()
     {
@@ -267,6 +282,11 @@ namespace rawinput
         {
             if(ev.usButtonFlags & lookup[i].windown) addevent(rawevent(REV_BUTTON, lookup[i].translate, 1));
             else if(ev.usButtonFlags & lookup[i].winup) addevent(rawevent(REV_BUTTON, lookup[i].translate, 0));
+        }
+        if(ev.usButtonFlags & RI_MOUSE_WHEEL)
+        {
+            SHORT delta = ((SHORT)ev.usButtonData) / WHEEL_DELTA;
+            addscroll(delta);
         }
     }
 
@@ -419,7 +439,8 @@ namespace rawinput
           { BTN_RIGHT, -SDL_BUTTON_RIGHT },
           { BTN_MIDDLE, -SDL_BUTTON_MIDDLE },
           { BTN_SIDE, -SDL_BUTTON_X1 },
-          { BTN_EXTRA, -SDL_BUTTON_X2 }
+          { BTN_EXTRA, -SDL_BUTTON_X2 },
+          { BTN_FORWARD, -SDL_BUTTON_WHEELUP }
         };
         static const int numbuttons = sizeof(lookup) / sizeof(buttonmap);
 
@@ -436,6 +457,9 @@ namespace rawinput
                     break;
                 case REL_Y:
                     addevent(rawevent(REV_MOTION, 0, ev.value));
+                    break;
+                case REL_WHEEL:
+                    addscroll(ev.value);
                     break;
                 }
                 break;
