@@ -858,7 +858,7 @@ void checkinput()
             case SDL_MOUSEMOTION:
                 if(rawinput::debugrawmouse)
                 {
-                    conoutf("%d sdl mouse event (%2d, %2d)",
+                    conoutf("%d sdl mouse motion (%d, %d)",
                             lastmillis, event.motion.xrel, event.motion.yrel);
                 }
                 if(grabinput && !rawinput::enabled)
@@ -874,8 +874,8 @@ void checkinput()
             case SDL_MOUSEBUTTONUP:
                 if(rawinput::debugrawmouse)
                 {
-                    conoutf("sdl mouse event (button 0x%02x) (state %d)",
-                            event.button.button, event.button.state);
+                    conoutf("%d sdl mouse button (button %d) (state %d)",
+                            lastmillis, event.button.button, event.button.state);
                 }
                 // avoid doubled events by checking against last type/button
                 if(rawinput::enabled || (lasttype==event.type && lastbut==event.button.button)) break;

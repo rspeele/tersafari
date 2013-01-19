@@ -103,8 +103,16 @@ namespace rawinput
             rawevent &ev = (*evs)[i];
             if(debugrawmouse)
             {
-                const char *names[] = { "REV_MOTION", "REV_BUTTON" };
-                conoutf("%d rawevent: %s %d %d", lastmillis, names[ev.type], ev.dx, ev.dy);
+                const char *fmt = "%d rawevent: %s (%d, %d)";
+                switch(ev.type)
+                {
+                case REV_MOTION:
+                    conoutf(fmt, lastmillis, "REV_MOTION", ev.dx, ev.dy);
+                    break;
+                case REV_BUTTON:
+                    conoutf(fmt, lastmillis, "REV_BUTTON", ev.button, ev.state);
+                    break;
+                }
             }
             switch(ev.type)
             {
@@ -191,6 +199,7 @@ namespace rawinput
         RegQueryValueExA(regkey, "DeviceDesc", NULL, &regtype, (LPBYTE)dev.name, &size);
         RegCloseKey(regkey);
         if(size > 0) dev.name[size-1] = '\0';
+        // fixme remove leading part up to and including first semicolon
     }
     // returns no. of devices listed
     int listdevices(vector<windev> &devs, bool (*filter)(windev &))
@@ -209,28 +218,24 @@ namespace rawinput
             return -1;
         }
         windev candidate;
-        loopi(numrids)
+        loopi(trylist)
         {
             candidate.device = rids[i].hDevice;
             candidate.type = rids[i].dwType;
             loadregistryinfo(candidate);
-            if(filter(candidate)) devs.add(candidate);
+            if(filter(candidate))
+            {
+                windev &winner = devs.add();
+                winner.device = candidate.device;
+                winner.type = candidate.type;
+                copystring(winner.name, candidate.name);
+            }
         }
-        return numrids;
+        return devs.length();
     }
 #define USAGE_PAGE_GENERIC_DESKTOP 0x01
 #define USAGE_MOUSE 0x02
 #define USAGE_KEYBOARD 0x06
-    // true on successful (un)registration
-    bool registerdevice(DWORD usage, HWND window, DWORD flags)
-    {
-        RAWINPUTDEVICE rid;
-        rid.usUsagePage = USAGE_PAGE_GENERIC_DESKTOP;
-        rid.usUsage = usage;
-        rid.dwFlags = flags;
-        rid.hwndTarget = window;
-        return (RegisterRawInputDevices(&rid, 1, sizeof(rid)) == TRUE);
-    }
 
     struct buttonmap
     {
@@ -253,7 +258,7 @@ namespace rawinput
     {
         if((ev.usFlags & MOUSE_MOVE_RELATIVE) == MOUSE_MOVE_RELATIVE)
         {
-            if(!g3d_movecursor(ev.lLastX, ev.lLastY)) mousemove(ev.lLastX, ev.lLastY);
+            addevent(rawevent(REV_MOTION, ev.lLastX, ev.lLastY));
         }
         for (int i = 0; i < numbuttons; i++)
         {
@@ -335,6 +340,17 @@ namespace rawinput
         return use;
     }
 
+    // true on successful (un)registration
+    bool registerdevice(DWORD usage, HWND window, DWORD flags)
+    {
+        RAWINPUTDEVICE rid;
+        rid.usUsagePage = USAGE_PAGE_GENERIC_DESKTOP;
+        rid.usUsage = usage;
+        rid.dwFlags = flags;
+        rid.hwndTarget = window;
+        return (RegisterRawInputDevices(&rid, 1, sizeof(rid)) == TRUE);
+    }
+
     int os_pick(const char *name)
     {
         if(enabled) return devices.length();
@@ -354,10 +370,9 @@ namespace rawinput
     {
         HWND handle = gethwnd();
         if(!handle) return;
-        if(!registerdevice(USAGE_MOUSE, handle, RIDEV_REMOVE))
+        if(!registerdevice(USAGE_MOUSE, handle, RIDEV_NOLEGACY|RIDEV_REMOVE) && debugrawmouse)
         {
             conoutf(CON_ERROR, "failed to unregister raw mouse");
-            return;
         }
         if(basewndproc != NULL)
         {
