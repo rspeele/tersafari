@@ -4,7 +4,9 @@ namespace rawinput
     bool enabled = false;
     VAR(debugrawmouse, 0, 0, 1);
     SVARFP(rawmouse, "", { pick(rawmouse); });
-//    ICOMMAND(listrawdevices, "", (), listdevices());
+#ifndef WIN32
+#define REV_THREADSAFE 1
+#endif
     // event interface common to raw input systems
     // provides a thread-safe buffered event system
     enum
@@ -52,17 +54,21 @@ namespace rawinput
     {
         release();
         if(!*name) return;
+#ifdef REV_THREADSAFE
         bufferlock = SDL_CreateMutex();
         if(!bufferlock)
         {
             conoutf(CON_ERROR, "Couldn't create mutex for raw input buffers");
             return;
         }
-        if(os_pick(name)) enabled = true; //FIXME offer "*" as catch-all name
+#endif
+        int count = os_pick(name);
+        if(count > 0) enabled = true; //FIXME offer "*" as catch-all name
         else
         {
             release();
-            conoutf(CON_ERROR, "Couldn't open any raw input devices matching \"%s\"", name);
+            if(count < 0) conoutf(CON_INFO, "Raw input is not supported on this system.");
+            else conoutf(CON_ERROR, "Couldn't open any raw input devices matching \"%s\"", name);
         }
     }
     // clear the processing (front) buffer and swap it with the
@@ -87,53 +93,49 @@ namespace rawinput
         SDL_UnlockMutex(bufferlock);
         return frontbuffer;
     }
+    void processevent(rawevent &ev)
+    {
+        if(debugrawmouse)
+        {
+            const char *fmt = "%d rawevent: %s (%d, %d)";
+            switch(ev.type)
+            {
+            case REV_MOTION:
+                conoutf(fmt, lastmillis, "REV_MOTION", ev.dx, ev.dy);
+                break;
+            case REV_BUTTON:
+                conoutf(fmt, lastmillis, "REV_BUTTON", ev.button, ev.state);
+                break;
+            }
+        }
+        switch(ev.type)
+        {
+        case REV_MOTION:
+            if(!g3d_movecursor(ev.dx, ev.dy)) mousemove(ev.dx, ev.dy);
+            break;
+        case REV_BUTTON:
+            keypress(ev.button, ev.state, 0);
+            break;
+        }
+    }
     // add an event to queue; completely thread-safe
     void addevent(rawevent ev)
     {
+#ifdef REV_THREADSAFE
         SDL_LockMutex(bufferlock);
         backbuffer->add(ev);
         SDL_UnlockMutex(bufferlock);
+#else
+        processevent(ev);
+#endif
     }
     // process pending events, call this as part of main loop
     void flush()
     {
+#ifdef REV_THREADSAFE
         vector<rawevent> *evs = swapevents();
-        loopv(*evs)
-        {
-            rawevent &ev = (*evs)[i];
-            if(debugrawmouse)
-            {
-                const char *fmt = "%d rawevent: %s (%d, %d)";
-                switch(ev.type)
-                {
-                case REV_MOTION:
-                    conoutf(fmt, lastmillis, "REV_MOTION", ev.dx, ev.dy);
-                    break;
-                case REV_BUTTON:
-                    conoutf(fmt, lastmillis, "REV_BUTTON", ev.button, ev.state);
-                    break;
-                }
-            }
-            switch(ev.type)
-            {
-            case REV_MOTION:
-                if(!g3d_movecursor(ev.dx, ev.dy)) mousemove(ev.dx, ev.dy);
-                break;
-            case REV_BUTTON:
-                keypress(ev.button, ev.state, 0);
-                break;
-            }
-        }
-    }
-    // device listing helper
-    static vector<char> devicenames;
-    bool listdevice(const char *name)
-    {
-        if(!devicenames.empty()) devicenames.add(' ');
-        devicenames.add('[');
-        devicenames.put(name, strcspn(name, "[]"));
-        devicenames.add(']');
-        return false;
+        loopv(*evs) processevent((*evs)[i]);
+#endif
     }
 }
 
@@ -335,20 +337,22 @@ namespace rawinput
 
     bool namefilter(windev &dev)
     {
+        if(dev.type != RIM_TYPEMOUSE) return false;
+        if(*rawmouse == '*') return true;
         bool use = strstr(dev.name, rawmouse);
         if(use) conoutf("Listening to raw device %s", dev.name);
         return use;
     }
 
     // true on successful (un)registration
-    bool registerdevice(DWORD usage, HWND window, DWORD flags)
+    bool registerdevice(DWORD usage, DWORD flags)
     {
         RAWINPUTDEVICE rid;
         rid.usUsagePage = USAGE_PAGE_GENERIC_DESKTOP;
         rid.usUsage = usage;
         rid.dwFlags = flags;
-        rid.hwndTarget = window;
-        return (RegisterRawInputDevices(&rid, 1, sizeof(rid)) == TRUE);
+        rid.hwndTarget = NULL;
+        return (RegisterRawInputDevices(&rid, 1, sizeof(RAWINPUTDEVICE)) == TRUE);
     }
 
     int os_pick(const char *name)
@@ -358,7 +362,7 @@ namespace rawinput
         if(!count) return 0;
         HWND handle = gethwnd();
         if(!handle) return 0;
-        if(registerdevice(USAGE_MOUSE, handle, RIDEV_NOLEGACY))
+        if(registerdevice(USAGE_MOUSE, RIDEV_NOLEGACY))
         {
             basewndproc = (WNDPROC)SetWindowLongPtr(handle, GWLP_WNDPROC, (LONG_PTR)rawwndproc);
             return count;
@@ -370,7 +374,7 @@ namespace rawinput
     {
         HWND handle = gethwnd();
         if(!handle) return;
-        if(!registerdevice(USAGE_MOUSE, handle, RIDEV_NOLEGACY|RIDEV_REMOVE) && debugrawmouse)
+        if(!registerdevice(USAGE_MOUSE, RIDEV_REMOVE) && debugrawmouse)
         {
             conoutf(CON_ERROR, "failed to unregister raw mouse");
         }
@@ -532,22 +536,9 @@ namespace rawinput
             else if(handle(fd, name)) break;
         }
     }
-    bool listdevice_callback(int fd, const char *name)
-    {
-        close(fd);
-        listdevice(name);
-        return false;
-    }
-    void listdevices()
-    {
-        devicenames.setsize(0);
-        searchdevs(listdevice_callback);
-        devicenames.add('\0');
-        result(devicenames.getbuf());
-    }
     bool usedev(int fd, const char *name)
     {
-        if(*rawmouse && strstr(name, rawmouse) == NULL)
+        if(*rawmouse != '*' && strstr(name, rawmouse) == NULL)
         {
             close(fd);
         }
