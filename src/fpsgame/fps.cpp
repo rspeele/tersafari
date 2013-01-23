@@ -299,6 +299,139 @@ namespace game
         return !((fpsent *)d)->lasttaunt || lastmillis-((fpsent *)d)->lasttaunt>=1000;
     }
 
+    // custom HUD
+    namespace hudstate
+    {
+        void load(const char *name);
+    }
+    SVARFP(customhud, "", hudstate::load(customhud));
+    namespace hudstate
+    {
+        uint lastscrw, lastscrh;
+        uint scrw = 0, scrh = 0;
+        uint r = 0xff, g = 0xff, b = 0xff, a = 0xff;
+        int x = 0, y = 0, w = 50, h = 0;
+        char xa = 'l', ya = 't';
+        float scale = 1.0f;
+        uint *code = NULL;
+
+        void setxy(int tx, int ty)
+        {
+            x = tx >= 0 ? tx : scrw - tx + 1;
+            y = ty >= 0 ? ty : scrh - ty + 1;
+        }
+        void setcolor(int rgb, int ta)
+        {
+            r = rgb >> 16 & 0xff;
+            g = rgb >> 8  & 0xff;
+            b = rgb       & 0xff;
+            a = ta ? ta : 0xff;
+            glColor4ub(r, g, b, a);
+        }
+        void setalpha(int a)
+        {
+            glColor4ub(r, g, b, a);
+        }
+        void align(int &tx, int &ty, int tw, int th)
+        {
+            tx -= xa == 'r' ? tw : (xa == 'c' ? tw/2 : 0);
+            ty -= ya == 'b' ? th : (ya == 'c' ? th/2 : 0);
+        }
+        void image(const char *img)
+        {
+            if(!*img) img = "packages/textures/white.png";
+            int ax = x, ay = y;
+            align(ax, ay, w, h);
+            settexture(img);
+            glBegin(GL_TRIANGLE_STRIP);
+            glTexCoord2f(0.0f, 0.0f); glVertex2i(ax, ay);
+            glTexCoord2f(1.0f, 0.0f); glVertex2i(ax + w, ay);
+            glTexCoord2f(0.0f, 1.0f); glVertex2i(ax, ay + h);
+            glTexCoord2f(1.0f, 1.0f); glVertex2i(ax + w, ay + h);
+            glEnd();
+        }
+        void text(char *str)
+        {
+            int ax = x, ay = y, aw, ah;
+            text_bounds(str, aw, ah);
+            aw *= scale; ah *= scale;
+            align(ax, ay, aw, ah);
+            ax /= scale; ay /= scale;
+            glPushMatrix();
+            glScalef(scale, scale, 1.0f);
+            draw_text(str, ax, ay, r, g, b, a);
+            glPopMatrix();
+        }
+        void textheight(int h)
+        {
+            int test, trash;
+            text_bounds("0", trash, test);
+            scale = (float)h / (float)test;
+        }
+        void load(const char *name)
+        {
+            string huddir = "packages/huds/";
+            concatstring(huddir, name);
+            execfile(makerelpath(huddir, "init.cfg"));
+            char *buf = loadfile(makerelpath(huddir, "hud.cfg"), NULL);
+            if (!buf)
+            {
+                conoutf(CON_ERROR, "missing script for hud \"%s\"", name);
+                return;
+            }
+            if (code) delete[] code;
+            code = compilecode(buf);
+            delete[] buf;
+        }
+        void draw()
+        {
+            if (scrw != lastscrw || scrh != lastscrh) load(customhud);
+            if(!code) return;
+            glPushMatrix();
+            execute(code);
+            glPopMatrix();
+            setfont("default");
+            lastscrw = scrw;
+            lastscrh = scrh;
+        }
+    }
+
+    // rendering HUD elements and adjusting state
+    ICOMMAND(hud_color, "ii", (int *rgb, int *a), hudstate::setcolor(*rgb, *a));
+    ICOMMAND(hud_alpha, "i", (int *a), hudstate::setalpha(*a));
+    ICOMMAND(hud_pos, "ii", (int *x, int *y), hudstate::setxy(*x, *y));
+    ICOMMAND(hud_size, "ii", (int *w, int *h), {hudstate::w = *w; hudstate::h = *h;});
+    ICOMMAND(hud_textscale, "f", (float *s), {hudstate::scale = *s;});
+    ICOMMAND(hud_textheight, "i", (int *h), hudstate::textheight(*h));
+    ICOMMAND(hud_align, "ss", (char *ya, char *xa), {hudstate::xa = *xa | 32; hudstate::ya = *ya | 32;});
+    ICOMMAND(hud_font, "s", (char *font), setfont(font));
+    ICOMMAND(hud_img, "s", (char *img), hudstate::image(img));
+    ICOMMAND(hud_text, "s", (char *str), hudstate::text(str));
+    ICOMMAND(hud_xpct, "i", (int *pct), intret(hudstate::scrw * (float)(*pct / 100.0f)));
+    ICOMMAND(hud_ypct, "i", (int *pct), intret(hudstate::scrh * (float)(*pct / 100.0f)));
+    // getting info about hud player
+    ICOMMAND(hudp_health, "", (), intret(hudplayer()->health));
+    ICOMMAND(hudp_armour, "", (), intret(hudplayer()->armour));
+    ICOMMAND(hudp_armourtype, "", (), intret(hudplayer()->armourtype));
+    ICOMMAND(hudp_ammo, "i", (int *i), if(*i >= 0 && *i < NUMGUNS) intret(hudplayer()->ammo[*i]));
+    ICOMMAND(hudp_gun, "", (), intret(hudplayer()->gunselect));
+    ICOMMAND(hudp_speed, "", (), intret(hudplayer()->vel.magnitude2()));
+    ICOMMAND(hudp_move, "", (), intret(hudplayer()->move));
+    ICOMMAND(hudp_strafe, "", (), intret(hudplayer()->strafe));
+    ICOMMAND(hudp_jumping, "", (), intret(hudplayer()->jumping));
+    ICOMMAND(hudp_attacking, "", (), intret(hudplayer()->attacking));
+    VARP(showkeys, 0, 0, 1);
+    // clock
+    VARP(clockup, 0, 0, 1);
+    int clockmillis() { return max(clockup ? lastmillis - maptime : maplimit - lastmillis, 0); }
+    ICOMMAND(clocksecs, "", (), intret(clockmillis()/1000));
+    ICOMMAND(clock, "i", (int *ts), {
+            int mins = *ts/60;
+            int secs = *ts%60;
+            defformatstring(sn)("%02d:%02d", mins, secs);
+            result(sn);
+        });
+
     VARP(hitsound, 0, 0, 1);
 
     void damaged(int damage, fpsent *d, fpsent *actor, bool local)
@@ -782,12 +915,18 @@ namespace game
 
     void gameplayhud(int w, int h)
     {
+        if(*customhud)
+        {
+            hudstate::scrw = w;
+            hudstate::scrh = h;
+            hudstate::draw();
+        }
         glPushMatrix();
         glScalef(h/1800.0f, h/1800.0f, 1);
 
+        int pw, ph, tw, th, fw, fh;
         if(player1->state==CS_SPECTATOR)
         {
-            int pw, ph, tw, th, fw, fh;
             text_bounds("  ", pw, ph);
             text_bounds("SPECTATOR", tw, th);
             th = max(th, ph);
@@ -807,10 +946,24 @@ namespace game
             }
         }
 
+        if(!*customhud && m_timed && maplimit >= 0)
+        {
+            int secs = clockmillis()/1000, mins = secs/60;
+            secs %= 60;
+            defformatstring(sn)("%d:%02d", mins, secs);
+            text_bounds(sn, tw, th);
+            glPushMatrix();
+            const float middlex = w*900.0f/h;
+            const float clocksize = 2.0f;
+            glScalef(clocksize, clocksize, 1.0f);
+            draw_text(sn, middlex/clocksize - tw / 2, 0);
+            glPopMatrix();
+        }
+
         fpsent *d = hudplayer();
         if(d->state!=CS_EDITING)
         {
-            if(d->state!=CS_SPECTATOR) drawhudicons(d);
+            if(!*customhud && d->state!=CS_SPECTATOR) drawhudicons(d);
             if(cmode) cmode->drawhud(d, w, h);
         }
 
