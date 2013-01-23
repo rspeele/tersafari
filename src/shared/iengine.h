@@ -53,6 +53,7 @@ extern int thirdperson;
 extern bool isthirdperson();
 
 extern bool settexture(const char *name, int clamp = 0);
+extern void enabletexture(const bool on);
 
 // octaedit
 

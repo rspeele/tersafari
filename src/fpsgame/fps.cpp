@@ -339,7 +339,6 @@ namespace game
         }
         void image(const char *img)
         {
-            if(!*img) img = "packages/textures/white.png";
             int ax = x, ay = y;
             align(ax, ay, w, h);
             settexture(img);
@@ -349,6 +348,19 @@ namespace game
             glTexCoord2f(0.0f, 1.0f); glVertex2i(ax, ay + h);
             glTexCoord2f(1.0f, 1.0f); glVertex2i(ax + w, ay + h);
             glEnd();
+        }
+        void rectangle()
+        {
+            int ax = x, ay = y;
+            align(ax, ay, w, h);
+            enabletexture(false);
+            glBegin(GL_TRIANGLE_STRIP);
+            glVertex2i(ax, ay);
+            glVertex2i(ax + w, ay);
+            glVertex2i(ax, ay + h);
+            glVertex2i(ax + w, ay + h);
+            glEnd();
+            enabletexture(true);
         }
         void text(char *str)
         {
@@ -405,7 +417,8 @@ namespace game
     ICOMMAND(hud_textheight, "i", (int *h), hudstate::textheight(*h));
     ICOMMAND(hud_align, "ss", (char *ya, char *xa), {hudstate::xa = *xa | 32; hudstate::ya = *ya | 32;});
     ICOMMAND(hud_font, "s", (char *font), setfont(font));
-    ICOMMAND(hud_img, "s", (char *img), hudstate::image(img));
+    ICOMMAND(hud_image, "s", (char *img), hudstate::image(img));
+    ICOMMAND(hud_rectangle, "", (), hudstate::rectangle());
     ICOMMAND(hud_text, "s", (char *str), hudstate::text(str));
     ICOMMAND(hud_xpct, "i", (int *pct), intret(hudstate::scrw * (float)(*pct / 100.0f)));
     ICOMMAND(hud_ypct, "i", (int *pct), intret(hudstate::scrh * (float)(*pct / 100.0f)));
