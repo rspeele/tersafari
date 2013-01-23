@@ -708,6 +708,7 @@ extern void clearsleep(bool clearoverrides = true);
 
 // console
 extern void keypress(int code, bool isdown, int cooked);
+extern bool consoleprompt();
 extern int rendercommand(int x, int y, int w);
 extern int renderconsole(int w, int h, int abovehud);
 extern void conoutf(const char *s, ...) PRINTFARGS(1, 2);

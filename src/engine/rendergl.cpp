@@ -2574,7 +2574,8 @@ void gl_drawhud(int w, int h)
             glPopMatrix();
         }
 
-        if(hidestats || (!editmode && !showeditstats))
+        bool windowhit = g3d_windowhit(true, false); // don't draw game hud when menu is up
+        if(!windowhit && !consoleprompt() && (hidestats || (!editmode && !showeditstats)))
         {
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
             game::gameplayhud(w, h);

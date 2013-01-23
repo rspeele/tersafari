@@ -65,6 +65,11 @@ int rendercommand(int x, int y, int w)
     return height;
 }
 
+bool consoleprompt() // is the console command prompt open?
+{
+    return commandmillis >= 0;
+}
+
 VARP(consize, 0, 5, 100);
 VARP(miniconsize, 0, 5, 100);
 VARP(miniconwidth, 0, 40, 100);
