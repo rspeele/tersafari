@@ -2849,11 +2849,11 @@ namespace server
                 int mag = p.get(); if(flags&(1<<3)) mag |= p.get()<<8;
                 int dir = p.get(); dir |= p.get()<<8;
                 // vec vel = vec((dir%360)*RAD, (clamp(dir/360, 0, 180)-90)*RAD).mul(mag/DVELF);
-                if(flags&(1<<4))
-                {
-                    p.get(); if(flags&(1<<5)) p.get();
-                    if(flags&(1<<6)) loopk(2) p.get();
-                }
+                // if(flags&(1<<4))
+                // {
+                //     p.get(); if(flags&(1<<5)) p.get();
+                //     if(flags&(1<<6)) loopk(2) p.get();
+                // }
                 if(cp)
                 {
                     if((!ci->local || demorecord || hasnonlocalclients()) && (cp->state.state==CS_ALIVE || cp->state.state==CS_EDITING))
