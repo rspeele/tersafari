@@ -2469,11 +2469,6 @@ void gl_drawhud(int w, int h)
             glScalef(conscale, conscale, 1);
 
             int roffset = 0;
-            if(showspeed)
-            {
-                int speed = (int)camera1->vel.magnitude2();
-                draw_textf("%3d ups", conw-5*FONTH, conh-FONTH*6/2, speed);
-            }
             if(showfps)
             {
                 static int lastfps = 0, prevfps[3] = { 0, 0, 0 }, curfps[3] = { 0, 0, 0 };
@@ -2487,6 +2482,12 @@ void gl_drawhud(int w, int h)
                 loopi(3) if(prevfps[i]==curfps[i]) curfps[i] = nextfps[i];
                 if(showfpsrange) draw_textf("fps %d+%d-%d", conw-7*FONTH, conh-FONTH*3/2, curfps[0], curfps[1], curfps[2]);
                 else draw_textf("fps %d", conw-5*FONTH, conh-FONTH*3/2, curfps[0]);
+                roffset += FONTH;
+            }
+            if(showspeed)
+            {
+                int speed = (int)camera1->vel.magnitude2();
+                draw_textf("%3d ups", conw-5*FONTH, conh-FONTH*3/2-roffset, speed);
                 roffset += FONTH;
             }
 
