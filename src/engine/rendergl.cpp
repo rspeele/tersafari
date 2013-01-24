@@ -988,6 +988,7 @@ VAR(avatarzoomfov, 10, 25, 60);
 VAR(avatarfov, 10, 65, 150);
 FVAR(avatardepth, 0, 0.5f, 1);
 FVARNP(aspect, forceaspect, 0, 0, 1e3f);
+VAR(headachefov, 0, 0, 1);
 
 static int zoommillis = 0;
 VARF(zoom, -1, 0, 1,
@@ -1002,6 +1003,12 @@ void disablezoom()
 
 void computezoom()
 {
+    if(headachefov)
+    {
+        const float alt = camera1->o.dist(worldpos);
+        curfov = min(160.0, atan(fov/alt)*2*(180.0f/PI));
+        return;
+    }
     if(!zoom) { curfov = fov; curavatarfov = avatarfov; return; }
     if(zoom < 0 && curfov >= fov) { zoom = 0; curfov = fov; curavatarfov = avatarfov; return; } // don't zoom-out if not zoomed-in
     int zoomvel = zoom > 0 ? zoominvel : zoomoutvel,
