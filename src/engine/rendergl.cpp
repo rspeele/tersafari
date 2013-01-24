@@ -1039,6 +1039,10 @@ VARP(zoomautosens, 0, 1, 1);
 FVARP(sensitivity, 1e-3f, 3, 1000);
 FVARP(mouse_yaw, -1.0f, 0.022f, 1.0f);
 FVARP(mouse_pitch, -1.0f, 0.022f, 1.0f);
+VARFP(invmouse, 0, 0, 1,
+      {
+          mouse_pitch = (invmouse ? -1 : 1) * fabs(mouse_pitch);
+      });
 FVARP(mouseaccel, 0, 0, 1000);
  
 VAR(thirdperson, 0, 0, 2);
