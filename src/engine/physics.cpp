@@ -1757,7 +1757,10 @@ namespace movement
         if(m.friction > 0)
         {
             const float speed = pl->vel.magnitude();
-            if(speed < stopspeed) pl->vel.x = pl->vel.y = 0; // come to a complete stop once moving very slowly
+            if(speed < stopspeed)
+            {
+                pl->vel.x = pl->vel.y = pl->vel.z = 0; // come to a complete stop once moving very slowly
+            }
             else
             {
                 // apply friction proportional to speed, but if the speed is less than fricspeed use that instead
