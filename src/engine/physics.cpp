@@ -1712,7 +1712,7 @@ FVAR(straferoll, 0, 0.033f, 90);
 FVAR(faderoll, 0, 0.95f, 1);
 VAR(floatspeed, 1, 100, 10000);
 
-namespace Movement
+namespace movement
 {
 // the parameters controlling movement behavior
     struct moveattrs
@@ -1766,9 +1766,10 @@ namespace Movement
                 pl->vel.mul(newspeed / speed); // rescale
             }
         }
-        const float wish = pl->maxspeed; // scale maxspeed according to moveattrs
+        const float wish = pl->maxspeed;
         const float current = m.vertical ? pl->vel.dot(wishdir) : pl->vel.dot2(wishdir);
-        const float add = wish * m.speed - current;
+        const float floatfac = floating ? floatspeed / 100.0f : 1.0f;
+        const float add = wish * floatfac * m.speed - current; // scale maxspeed according to moveattrs
         if(add > 0)
         {
             const float accel = min(add, m.acceleration * curtime * wish);
@@ -1819,7 +1820,7 @@ void modifyvelocity(physent *pl, bool local, bool water, bool floating, int curt
 
         m.normalize();
     }
-    Movement::accelfric(pl, m, floating, curtime);
+    movement::accelfric(pl, m, floating, curtime);
 //     vec d(m);
 //     d.mul(pl->maxspeed);
 //     if(pl->type==ENT_PLAYER)
