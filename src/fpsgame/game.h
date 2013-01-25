@@ -317,7 +317,7 @@ static struct itemstat { int add, max, sound; const char *name; int icon, info; 
     {5,     30,    S_ITEMAMMO,   "RL", HICON_RL, GUN_RL},
     {5,     15,    S_ITEMAMMO,   "RI", HICON_RIFLE, GUN_RIFLE},
     {10,    30,    S_ITEMAMMO,   "GL", HICON_GL, GUN_GL},
-    {30,    120,   S_ITEMAMMO,   "PI", HICON_PISTOL, GUN_PISTOL},
+    {18,    60,    S_ITEMAMMO,   "PI", HICON_PISTOL, GUN_PISTOL},
     {25,    100,   S_ITEMHEALTH, "H",  HICON_HEALTH},
     {30000, 60000, S_ITEMHEALTH, "MH", HICON_HEALTH},
     {75,    150,   S_ITEMARMOUR, "GA", HICON_GREEN_ARMOUR, A_GREEN},
@@ -334,7 +334,7 @@ static const struct guninfo { int sound, attackdelay, charge, damage, spread, pr
 {
     { S_PUNCH1,    250,    0,  50,   0,   0,  0,   14,  1,  80,  0,    0,  0, 0,    0, "fist",            "fist"  },
     { S_SG,        800,    0,   4, 100,   0,  0, 1024, 25,  80,  0,    0,  0, 0,    0, "shotgun",         "shotg" },
-    { S_CG,         75,    0,  10,  20,   0,  0, 1024,  1,  80,  0,    0, 40, 1,  400, "chaingun",        "chaing" },
+    { S_CG,         75,    0,  10,  20,   0,  0, 1024,  1,  80,  0,    0,  0, 0,    0, "chaingun",        "chaing" },
     { S_RLFIRE,    950,    0, 110,   0, 300,  0, 1024,  1, 170, 30,    0,  0, 0,    0, "rocketlauncher",  "rocket" },
     { S_RIFLE,    1500,    0,  90,   0,   0, 15, 2048,  1,  80,  0,    0,  0, 0,    0, "rifle",           "rifle" },
     { S_FLAUNCH,   900, 1500,  90,   0, 210,  0, 1024,  1, 250, 45,  600,  0, 0,    0, "grenadelauncher", "gl" },
@@ -528,14 +528,14 @@ struct fpsstate
         {
             armourtype = A_BLUE;
             armour = 50;
-            ammo[GUN_PISTOL] = 40;
+            ammo[GUN_PISTOL] = 24;
             ammo[GUN_GL] = 1;
         }
         else
         {
             armourtype = A_BLUE;
             armour = 25;
-            ammo[GUN_PISTOL] = 40;
+            ammo[GUN_PISTOL] = 24;
             ammo[GUN_GL] = 1;
         }
     }
