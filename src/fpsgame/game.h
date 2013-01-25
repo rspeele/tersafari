@@ -328,20 +328,20 @@ static struct itemstat { int add, max, sound; const char *name; int icon, info; 
 #define EXP_SELFPUSH 1.5f
 #define EXP_DISTSCALE 1.5f
 
-static const struct guninfo { int sound, attackdelay, charge, damage, spread, projspeed, kickamount, range, rays, hitpush, exprad, ttl; const char *name, *file; } guns[NUMGUNS] =
+static const struct guninfo { int sound, attackdelay, charge, damage, spread, projspeed, kickamount, range, rays, hitpush, exprad, ttl, capacity, reload, reloaddelay; const char *name, *file; } guns[NUMGUNS] =
 {
-    { S_PUNCH1,    250,    0,  50,   0,   0,  0,   14,  1,  80,  0,    0, "fist",            "fist"  },
-    { S_SG,        800,    0,   4, 100,   0,  0, 1024, 25,  80,  0,    0, "shotgun",         "shotg" },
-    { S_CG,         75,    0,  10,  20,   0,  0, 1024,  1,  80,  0,    0, "chaingun",        "chaing" },
-    { S_RLFIRE,    950,    0, 110,   0, 300,  0, 1024,  1, 170, 30,    0, "rocketlauncher",  "rocket" },
-    { S_RIFLE,    1500,    0,  90,   0,   0, 15, 2048,  1,  80,  0,    0, "rifle",           "rifle" },
-    { S_FLAUNCH,   900, 1500,  90,   0, 210,  0, 1024,  1, 250, 45,  600, "grenadelauncher", "gl" },
-    { S_PISTOL,    500,    0,  35,  20,   0,  0, 1024,  1,  80,  0,    0, "pistol",          "pistol" },
-    { S_FLAUNCH,   200,    0,  20,   0, 200,  1, 1024,  1,  80, 40,    0, "fireball",        NULL },
-    { S_ICEBALL,   200,    0,  40,   0, 120,  1, 1024,  1,  80, 40,    0, "iceball",         NULL },
-    { S_SLIMEBALL, 200,    0,  30,   0, 640,  1, 1024,  1,  80, 40,    0, "slimeball",       NULL },
-    { S_PIGR1,     250,    0,  50,   0,   0,  1,   12,  1,  80,  0,    0, "bite",            NULL },
-    { -1,            0,    0, 120,   0,   0,  0,    0,  1,  80, 40,    0, "barrel",          NULL }
+    { S_PUNCH1,    250,    0,  50,   0,   0,  0,   14,  1,  80,  0,    0,  0, 1,    0, "fist",            "fist"  },
+    { S_SG,        800,    0,   4, 100,   0,  0, 1024, 25,  80,  0,    0,  1, 1,    0, "shotgun",         "shotg" },
+    { S_CG,         75,    0,  10,  20,   0,  0, 1024,  1,  80,  0,    0, 20, 1,    0, "chaingun",        "chaing" },
+    { S_RLFIRE,    950,    0, 110,   0, 300,  0, 1024,  1, 170, 30,    0,  1, 1,    0, "rocketlauncher",  "rocket" },
+    { S_RIFLE,    1500,    0,  90,   0,   0, 15, 2048,  1,  80,  0,    0,  1, 1,    0, "rifle",           "rifle" },
+    { S_FLAUNCH,   900, 1500,  90,   0, 210,  0, 1024,  1, 250, 45,  600,  1, 1,    0, "grenadelauncher", "gl" },
+    { S_PISTOL,    300,    0,  35,  20,   0,  0, 1024,  1,  80,  0,    0,  6, 6, 1100, "pistol",          "pistol" },
+    { S_FLAUNCH,   200,    0,  20,   0, 200,  1, 1024,  1,  80, 40,    0,  1, 1,    0, "fireball",        NULL },
+    { S_ICEBALL,   200,    0,  40,   0, 120,  1, 1024,  1,  80, 40,    0,  1, 1,    0, "iceball",         NULL },
+    { S_SLIMEBALL, 200,    0,  30,   0, 640,  1, 1024,  1,  80, 40,    0,  1, 1,    0, "slimeball",       NULL },
+    { S_PIGR1,     250,    0,  50,   0,   0,  1,   12,  1,  80,  0,    0,  1, 1,    0, "bite",            NULL },
+    { -1,            0,    0, 120,   0,   0,  0,    0,  1,  80, 40,    0,  1, 1,    0, "barrel",          NULL }
 };
 
 #include "ai.h"
@@ -393,7 +393,7 @@ struct fpsstate
     int health, maxhealth;
     int armour, armourtype;
     int gunselect, gunwait;
-    int ammo[NUMGUNS];
+    int ammo[NUMGUNS], magazine[NUMGUNS];
     int aitype, skill;
 
     server::quadstate quad;
@@ -477,6 +477,7 @@ struct fpsstate
         gunselect = GUN_PISTOL;
         gunwait = 0;
         loopi(NUMGUNS) ammo[i] = 0;
+        loopi(NUMGUNS) magazine[i] = 0;
         ammo[GUN_FIST] = 1;
     }
 
@@ -563,6 +564,7 @@ struct fpsent : dynent, fpsstate
     int respawned, suicided;
     int lastpain;
     int lastyelp;
+    int lastreload;
     int lastaction, lastattackgun;
     int attackcharge;
     bool attacking;
@@ -619,6 +621,7 @@ struct fpsent : dynent, fpsstate
         dynent::reset();
         fpsstate::respawn();
         respawned = suicided = -1;
+        lastreload = 0;
         lastaction = 0;
         lastattackgun = gunselect;
         attackcharge = 0;

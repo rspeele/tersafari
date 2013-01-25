@@ -25,6 +25,7 @@ namespace game
             addmsg(N_GUNSELECT, "rci", d, gun);
             playsound(S_WEAPLOAD, &d->o);
             d->attackcharge = 0; // forget charge
+            d->lastreload = lastmillis;
         }
         d->gunselect = gun;
     }
@@ -759,24 +760,51 @@ namespace game
         else if(d->gunselect!=GUN_FIST && d->gunselect!=GUN_BITE) adddecal(DECAL_BULLET, to, vec(from).sub(to).normalize(), d->gunselect==GUN_RIFLE ? 3.0f : 2.0f);
     }
 
-    void shoot(fpsent *d, const vec &targ)
+    const bool checkgunwait(fpsent *d)
     {
-        int prevaction = d->lastaction, attacktime = lastmillis-prevaction;
-        if(attacktime<d->gunwait) return;
+        if(lastmillis-d->lastaction < d->gunwait) return false;
         d->gunwait = 0;
+        return true;
+    }
+    const bool checkcharge(fpsent *d)
+    {
         if(d==player1 || d->ai)
         {
             // if attacking with no existing charge, set charge
             if(d->attacking && !d->attackcharge) d->attackcharge = lastmillis;
             // if not attacking, and no charge, don't shoot
-            if(!d->attacking && !d->attackcharge) return;
+            if(!d->attacking && !d->attackcharge) return false;
             // if attacking, but still charging, don't shoot
-            if(d->attacking && lastmillis - d->attackcharge < guns[d->gunselect].charge) return;
+            if(d->attacking && lastmillis - d->attackcharge < guns[d->gunselect].charge) return false;
         }
+        return true;
+    }
+    const bool checkreload(fpsent * d)
+    {
+        const int gun = d->gunselect;
+        const int capacity = guns[gun].capacity;
+        if(d->magazine[gun] >= capacity) return true;
+        const int reloadtime = lastmillis - max(d->lastaction, d->lastreload);
+        if(d->ammo[gun] && reloadtime >= guns[gun].reloaddelay)
+        {
+            const int reload = min(capacity - d->magazine[gun], min(guns[gun].reload, d->ammo[gun]));
+            d->magazine[gun] += reload;
+            d->ammo[gun] -= reload;
+            d->lastreload = lastmillis;
+        }
+        return d->magazine[d->gunselect] > 0;
+    }
+    void shoot(fpsent *d, const vec &targ)
+    {
+        const int prevaction = d->lastaction;
+        if(!checkreload(d)) return;
+        if(!checkgunwait(d)) return;
+        if(!checkcharge(d)) return;
         const int charge = d->attackcharge ? lastmillis - d->attackcharge : 0;
         d->attackcharge = 0;
         d->lastaction = lastmillis;
         d->lastattackgun = d->gunselect;
+
         if(!d->ammo[d->gunselect])
         {
             if(d==player1)
@@ -788,7 +816,7 @@ namespace game
             }
             return;
         }
-        if(d->gunselect) d->ammo[d->gunselect]--;
+        if(d->gunselect) d->magazine[d->gunselect]--;
         vec from = d->o;
         vec to = targ;
 

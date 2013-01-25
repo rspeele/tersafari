@@ -427,6 +427,7 @@ namespace game
     ICOMMAND(hudp_armour, "", (), intret(hudplayer()->armour));
     ICOMMAND(hudp_armourtype, "", (), intret(hudplayer()->armourtype));
     ICOMMAND(hudp_ammo, "i", (int *i), if(*i >= 0 && *i < NUMGUNS) intret(hudplayer()->ammo[*i]));
+    ICOMMAND(hudp_magazine, "i", (int *i), if(*i >= 0 && *i < NUMGUNS) intret(hudplayer()->magazine[*i]));
     ICOMMAND(hudp_gun, "", (), intret(hudplayer()->gunselect));
     ICOMMAND(hudp_speed, "", (), intret(hudplayer()->vel.magnitude2()));
     ICOMMAND(hudp_move, "", (), intret(hudplayer()->move));
