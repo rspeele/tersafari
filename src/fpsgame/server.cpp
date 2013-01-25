@@ -56,9 +56,9 @@ namespace server
         vec dir;
     };
 
-    struct reloadevent : timedevent
+    struct reloadevent : gameevent
     {
-        int id, gun;
+        int gun;
 
         void process(clientinfo *ci);
     };
@@ -126,7 +126,7 @@ namespace server
         vec o;
         int state, editstate;
         int lastdeath, deadflush, lastspawn, lifesequence;
-        int lastshot, lastreload;
+        int lastshot;
         projectilestate<8> rockets, grenades;
         int frags, flags, deaths, teamkills, shotdamage, damage, tokens;
         int lasttimeplayed, timeplayed;
@@ -1667,6 +1667,7 @@ namespace server
         putint(p, gs.armourtype);
         putint(p, gs.gunselect);
         loopi(GUN_PISTOL-GUN_SG+1) putint(p, gs.ammo[GUN_SG+i]);
+        loopi(GUN_PISTOL-GUN_SG+1) putint(p, gs.magazine[GUN_SG+i]);
     }
 
     void spawnstate(clientinfo *ci)
@@ -1680,10 +1681,12 @@ namespace server
     {
         gamestate &gs = ci->state;
         spawnstate(ci);
-        sendf(ci->ownernum, 1, "rii7v", N_SPAWNSTATE, ci->clientnum, gs.lifesequence,
+        sendf(ci->ownernum, 1, "ri8vv", N_SPAWNSTATE, ci->clientnum, gs.lifesequence,
             gs.health, gs.maxhealth,
             gs.armour, gs.armourtype,
-            gs.gunselect, GUN_PISTOL-GUN_SG+1, &gs.ammo[GUN_SG]);
+            gs.gunselect,
+            GUN_PISTOL-GUN_SG+1, &gs.ammo[GUN_SG],
+            GUN_PISTOL-GUN_SG+1, &gs.magazine[GUN_SG]);
         gs.lastspawn = gamemillis;
     }
 
@@ -1865,12 +1868,15 @@ namespace server
     void sendresume(clientinfo *ci)
     {
         gamestate &gs = ci->state;
-        sendf(-1, 1, "ri4i9vi", N_RESUME, ci->clientnum,
+        sendf(-1, 1, "ri4i9vvi", N_RESUME, ci->clientnum,
               gs.state, gs.frags, gs.flags, gs.quad.millis, gs.boost.millis,
               gs.lifesequence,
               gs.health, gs.maxhealth,
               gs.armour, gs.armourtype,
-              gs.gunselect, GUN_PISTOL-GUN_SG+1, &gs.ammo[GUN_SG], -1);
+              gs.gunselect,
+              GUN_PISTOL-GUN_SG+1, &gs.ammo[GUN_SG],
+              GUN_PISTOL-GUN_SG+1, &gs.magazine[GUN_SG],
+              -1);
     }
 
     void sendinitclient(clientinfo *ci)
@@ -2180,9 +2186,7 @@ namespace server
     void reloadevent::process(clientinfo *ci)
     {
         gamestate &gs = ci->state;
-        if(millis - gs.lastreload < guns[gs.gunselect].reloaddelay) return;
         gs.reload(gun);
-        gs.lastreload = millis;
         sendf(-1, 1, "ri3x", N_RELOAD, ci->clientnum, gun, ci->ownernum);
     }
 
@@ -3025,13 +3029,8 @@ namespace server
             case N_RELOAD:
             {
                 reloadevent *reload = new reloadevent;
-                reload->id = getint(p);
                 reload->gun = getint(p);
-                if(cq)
-                {
-                    reload->millis = cq->geteventmillis(gamemillis, reload->id);
-                    cq->addevent(reload);
-                }
+                if(cq) cq->addevent(reload);
                 else delete reload;
                 break;
             }

@@ -1157,13 +1157,14 @@ namespace game
         if(resume && d==player1)
         {
             getint(p);
-            loopi(GUN_PISTOL-GUN_SG+1) getint(p);
+            loopi((GUN_PISTOL-GUN_SG+1) * 2) getint(p);
         }
         else
         {
             int gun = getint(p);
             d->gunselect = clamp(gun, int(GUN_FIST), int(GUN_PISTOL));
             loopi(GUN_PISTOL-GUN_SG+1) d->ammo[GUN_SG+i] = getint(p);
+            loopi(GUN_PISTOL-GUN_SG+1) d->magazine[GUN_SG+i] = getint(p);
         }
     }
 

@@ -233,10 +233,10 @@ enum
 static const int msgsizes[] =               // size inclusive message token, 0 for variable or not-checked sizes
 {
     N_CONNECT, 0, N_SERVINFO, 0, N_WELCOME, 1, N_INITCLIENT, 0, N_POS, 0, N_TEXT, 0, N_SOUND, 2, N_CDIS, 2,
-    N_RELOAD, 0,
+    N_RELOAD, 2,
     N_SHOOT, 0, N_EXPLODE, 0, N_SUICIDE, 1,
     N_DIED, 6, N_DAMAGE, 6, N_HITPUSH, 7, N_SHOTFX, 11, N_EXPLODEFX, 4,
-    N_TRYSPAWN, 1, N_SPAWNSTATE, 14, N_SPAWN, 3, N_FORCEDEATH, 2,
+    N_TRYSPAWN, 1, N_SPAWNSTATE, 20, N_SPAWN, 3, N_FORCEDEATH, 2,
     N_GUNSELECT, 2, N_TAUNT, 1,
     N_MAPCHANGE, 0, N_MAPVOTE, 0, N_TEAMINFO, 0, N_ITEMSPAWN, 2, N_ITEMPICKUP, 2, N_ITEMACC, 3,
     N_PING, 2, N_PONG, 2, N_CLIENTPING, 2,
@@ -332,18 +332,18 @@ static struct itemstat { int add, max, sound; const char *name; int icon, info; 
 
 static const struct guninfo { int sound, attackdelay, charge, damage, spread, projspeed, kickamount, range, rays, hitpush, exprad, ttl, capacity, reload, reloaddelay; const char *name, *file; } guns[NUMGUNS] =
 {
-    { S_PUNCH1,    250,    0,  50,   0,   0,  0,   14,  1,  80,  0,    0,  0, 1,    0, "fist",            "fist"  },
-    { S_SG,        800,    0,   4, 100,   0,  0, 1024, 25,  80,  0,    0,  0, 1,    0, "shotgun",         "shotg" },
-    { S_CG,         75,    0,  10,  20,   0,  0, 1024,  1,  80,  0,    0,  0, 1,    0, "chaingun",        "chaing" },
-    { S_RLFIRE,    950,    0, 110,   0, 300,  0, 1024,  1, 170, 30,    0,  0, 1,    0, "rocketlauncher",  "rocket" },
-    { S_RIFLE,    1500,    0,  90,   0,   0, 15, 2048,  1,  80,  0,    0,  0, 1,    0, "rifle",           "rifle" },
-    { S_FLAUNCH,   900, 1500,  90,   0, 210,  0, 1024,  1, 250, 45,  600,  0, 1,    0, "grenadelauncher", "gl" },
+    { S_PUNCH1,    250,    0,  50,   0,   0,  0,   14,  1,  80,  0,    0,  0, 0,    0, "fist",            "fist"  },
+    { S_SG,        800,    0,   4, 100,   0,  0, 1024, 25,  80,  0,    0,  0, 0,    0, "shotgun",         "shotg" },
+    { S_CG,         75,    0,  10,  20,   0,  0, 1024,  1,  80,  0,    0, 40, 1,  400, "chaingun",        "chaing" },
+    { S_RLFIRE,    950,    0, 110,   0, 300,  0, 1024,  1, 170, 30,    0,  0, 0,    0, "rocketlauncher",  "rocket" },
+    { S_RIFLE,    1500,    0,  90,   0,   0, 15, 2048,  1,  80,  0,    0,  0, 0,    0, "rifle",           "rifle" },
+    { S_FLAUNCH,   900, 1500,  90,   0, 210,  0, 1024,  1, 250, 45,  600,  0, 0,    0, "grenadelauncher", "gl" },
     { S_PISTOL,    300,    0,  15,   0,   0,  0, 1024,  1,  80,  0,    0,  6, 6, 1100, "pistol",          "pistol" },
-    { S_FLAUNCH,   200,    0,  20,   0, 200,  1, 1024,  1,  80, 40,    0,  0, 1,    0, "fireball",        NULL },
-    { S_ICEBALL,   200,    0,  40,   0, 120,  1, 1024,  1,  80, 40,    0,  0, 1,    0, "iceball",         NULL },
-    { S_SLIMEBALL, 200,    0,  30,   0, 640,  1, 1024,  1,  80, 40,    0,  0, 1,    0, "slimeball",       NULL },
-    { S_PIGR1,     250,    0,  50,   0,   0,  1,   12,  1,  80,  0,    0,  0, 1,    0, "bite",            NULL },
-    { -1,            0,    0, 120,   0,   0,  0,    0,  1,  80, 40,    0,  0, 1,    0, "barrel",          NULL }
+    { S_FLAUNCH,   200,    0,  20,   0, 200,  1, 1024,  1,  80, 40,    0,  0, 0,    0, "fireball",        NULL },
+    { S_ICEBALL,   200,    0,  40,   0, 120,  1, 1024,  1,  80, 40,    0,  0, 0,    0, "iceball",         NULL },
+    { S_SLIMEBALL, 200,    0,  30,   0, 640,  1, 1024,  1,  80, 40,    0,  0, 0,    0, "slimeball",       NULL },
+    { S_PIGR1,     250,    0,  50,   0,   0,  1,   12,  1,  80,  0,    0,  0, 0,    0, "bite",            NULL },
+    { -1,            0,    0, 120,   0,   0,  0,    0,  1,  80, 40,    0,  0, 0,    0, "barrel",          NULL }
 };
 
 #include "ai.h"

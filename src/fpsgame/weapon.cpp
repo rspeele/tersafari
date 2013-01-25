@@ -22,7 +22,7 @@ namespace game
     {
         d->reload(gun);
         d->lastreload = lastmillis;
-        addmsg(N_RELOAD, "rci2", d, lastmillis-maptime, gun);
+        addmsg(N_RELOAD, "rci", d, gun);
     }
 
     void gunselect(int gun, fpsent *d)
