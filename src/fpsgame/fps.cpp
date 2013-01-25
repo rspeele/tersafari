@@ -382,6 +382,12 @@ namespace game
         }
         void load(const char *name)
         {
+            if(!*name)
+            {
+                if(code) delete[] code;
+                code = NULL;
+                return;
+            }
             string huddir = "packages/huds/";
             concatstring(huddir, name);
             execfile(makerelpath(huddir, "init.cfg"));
@@ -873,7 +879,7 @@ namespace game
         loopi(3)
         {
             int gun = ammohudup[i];
-            if(gun < GUN_FIST || gun > GUN_PISTOL || gun == d->gunselect || !d->ammo[gun]) continue;
+            if(gun < GUN_FIST || gun > GUN_PISTOL || gun == d->gunselect || !d->hasammo(gun)) continue;
             drawicon(HICON_FIST+gun, xup, yup, sz);
             yup += sz;
         }
@@ -881,7 +887,7 @@ namespace game
         loopi(3)
         {
             int gun = ammohuddown[3-i-1];
-            if(gun < GUN_FIST || gun > GUN_PISTOL || gun == d->gunselect || !d->ammo[gun]) continue;
+            if(gun < GUN_FIST || gun > GUN_PISTOL || gun == d->gunselect || !d->hasammo(gun)) continue;
             ydown -= sz;
             drawicon(HICON_FIST+gun, xdown, ydown, sz);
         }
@@ -897,7 +903,7 @@ namespace game
         loopi(7)
         {
             int gun = ammohudcycle[(i + offset)%7];
-            if(gun < GUN_FIST || gun > GUN_PISTOL || gun == d->gunselect || !d->ammo[gun]) continue;
+            if(gun < GUN_FIST || gun > GUN_PISTOL || gun == d->gunselect || !d->hasammo(gun)) continue;
             xcycle -= sz;
             drawicon(HICON_FIST+gun, xcycle, ycycle, sz);
         }
@@ -913,7 +919,9 @@ namespace game
         if(d->state!=CS_DEAD)
         {
             if(d->armour) draw_textf("%d", (HICON_X + HICON_STEP + HICON_SIZE + HICON_SPACE)/2, HICON_TEXTY/2, d->armour);
-            draw_textf("%d", (HICON_X + 2*HICON_STEP + HICON_SIZE + HICON_SPACE)/2, HICON_TEXTY/2, d->ammo[d->gunselect]);
+            const int ammox = (HICON_X + 2*HICON_STEP + HICON_SIZE + HICON_SPACE)/2, ammoy = HICON_TEXTY/2;
+            if(guns[d->gunselect].capacity) draw_textf("%d\\%d", ammox, ammoy, d->magazine[d->gunselect], d->ammo[d->gunselect]);
+            else draw_textf("%d", ammox, ammoy, d->ammo[d->gunselect]);
         }
 
         glPopMatrix();
