@@ -56,6 +56,13 @@ namespace server
         vec dir;
     };
 
+    struct reloadevent : timedevent
+    {
+        int id, gun;
+
+        void process(clientinfo *ci);
+    };
+
     struct shotevent : timedevent
     {
         int id, gun, charge;
@@ -119,7 +126,7 @@ namespace server
         vec o;
         int state, editstate;
         int lastdeath, deadflush, lastspawn, lifesequence;
-        int lastshot;
+        int lastshot, lastreload;
         projectilestate<8> rockets, grenades;
         int frags, flags, deaths, teamkills, shotdamage, damage, tokens;
         int lasttimeplayed, timeplayed;
@@ -2170,6 +2177,15 @@ namespace server
         }
     }
 
+    void reloadevent::process(clientinfo *ci)
+    {
+        gamestate &gs = ci->state;
+        if(millis - gs.lastreload < guns[gs.gunselect].reloaddelay) return;
+        gs.reload(gun);
+        gs.lastreload = millis;
+        sendf(-1, 1, "ri3x", N_RELOAD, ci->clientnum, gun, ci->ownernum);
+    }
+
     void shotevent::process(clientinfo *ci)
     {
         gamestate &gs = ci->state;
@@ -2177,9 +2193,9 @@ namespace server
         if(!gs.isalive(gamemillis) ||
            wait<gs.gunwait ||
            gun<GUN_FIST || gun>GUN_PISTOL ||
-           gs.ammo[gun]<=0 || (guns[gun].range && from.dist(to) > guns[gun].range + 1))
+           !gs.ammosource(gun) || (guns[gun].range && from.dist(to) > guns[gun].range + 1))
             return;
-        if(gun!=GUN_FIST) gs.ammo[gun]--;
+        if(gun!=GUN_FIST) gs.ammosource(gun)--;
         gs.lastshot = millis;
         gs.gunwait = guns[gun].attackdelay;
         sendf(-1, 1, "ri2i9x", N_SHOTFX, ci->clientnum, gun, charge, id,
@@ -3003,6 +3019,20 @@ namespace server
             case N_SUICIDE:
             {
                 if(cq) cq->addevent(new suicideevent);
+                break;
+            }
+
+            case N_RELOAD:
+            {
+                reloadevent *reload = new reloadevent;
+                reload->id = getint(p);
+                reload->gun = getint(p);
+                if(cq)
+                {
+                    reload->millis = cq->geteventmillis(gamemillis, reload->id);
+                    cq->addevent(reload);
+                }
+                else delete reload;
                 break;
             }
 

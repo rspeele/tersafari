@@ -1403,6 +1403,15 @@ namespace game
                 break;
             }
 
+            case N_RELOAD:
+            {
+                int cn = getint(p), gun = getint(p);
+                fpsent *s = getclient(cn);
+                if(!s || gun < GUN_FIST || gun >= NUMGUNS) break;
+                s->reload(gun);
+                break;
+            }
+
             case N_SHOTFX:
             {
                 int scn = getint(p), gun = getint(p), charge = getint(p), id = getint(p);
@@ -1411,7 +1420,7 @@ namespace game
                 loopk(3) to[k] = getint(p)/DMF;
                 fpsent *s = getclient(scn);
                 if(!s) break;
-                if(gun>GUN_FIST && gun<=GUN_PISTOL && s->ammo[gun]) s->ammo[gun]--;
+                if(gun>GUN_FIST && gun<=GUN_PISTOL && s->ammosource(gun)) s->ammosource(gun)--;
                 s->gunselect = clamp(gun, (int)GUN_FIST, (int)GUN_PISTOL);
                 s->gunwait = guns[s->gunselect].attackdelay;
                 int prevaction = s->lastaction;

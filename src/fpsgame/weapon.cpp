@@ -18,6 +18,13 @@ namespace game
 
     ICOMMAND(getweapon, "", (), intret(player1->gunselect));
 
+    void reload(int gun, fpsent *d)
+    {
+        d->reload(gun);
+        d->lastreload = lastmillis;
+        addmsg(N_RELOAD, "rci2", d, lastmillis-maptime, gun);
+    }
+
     void gunselect(int gun, fpsent *d)
     {
         if(gun!=d->gunselect)
@@ -38,7 +45,7 @@ namespace game
         loopi(NUMGUNS)
         {
             gun = (gun + dir)%NUMGUNS;
-            if(force || player1->ammo[gun]) break;
+            if(force || player1->hasammo(gun)) break;
         }
         if(gun != player1->gunselect) gunselect(gun, player1);
         else playsound(S_NOAMMO);
@@ -57,7 +64,7 @@ namespace game
     {
         int gun = getweapon(name);
         if(player1->state!=CS_ALIVE || gun<GUN_FIST || gun>GUN_PISTOL) return;
-        if(force || player1->ammo[gun]) gunselect(gun, player1);
+        if(force || player1->hasammo(gun)) gunselect(gun, player1);
         else playsound(S_NOAMMO);
     }
     ICOMMAND(setweapon, "si", (char *name, int *force), setweapon(name, *force!=0));
@@ -70,7 +77,7 @@ namespace game
         loopi(numguns)
         {
             int gun = guns[(i+offset)%numguns];
-            if(gun>=0 && gun<NUMGUNS && (force || player1->ammo[gun]))
+            if(gun>=0 && gun<NUMGUNS && (force || player1->hasammo(gun)))
             {
                 gunselect(gun, player1);
                 return;
@@ -90,12 +97,12 @@ namespace game
     {
         if(d->state!=CS_ALIVE) return;
         int s = d->gunselect;
-        if     (s!=GUN_CG     && d->ammo[GUN_CG])     s = GUN_CG;
-        else if(s!=GUN_RL     && d->ammo[GUN_RL])     s = GUN_RL;
-        else if(s!=GUN_SG     && d->ammo[GUN_SG])     s = GUN_SG;
-        else if(s!=GUN_RIFLE  && d->ammo[GUN_RIFLE])  s = GUN_RIFLE;
-        else if(s!=GUN_GL     && d->ammo[GUN_GL])     s = GUN_GL;
-        else if(s!=GUN_PISTOL && d->ammo[GUN_PISTOL]) s = GUN_PISTOL;
+        if     (s!=GUN_CG     && d->hasammo(GUN_CG))     s = GUN_CG;
+        else if(s!=GUN_RL     && d->hasammo(GUN_RL))     s = GUN_RL;
+        else if(s!=GUN_SG     && d->hasammo(GUN_SG))     s = GUN_SG;
+        else if(s!=GUN_RIFLE  && d->hasammo(GUN_RIFLE))  s = GUN_RIFLE;
+        else if(s!=GUN_GL     && d->hasammo(GUN_GL))     s = GUN_GL;
+        else if(s!=GUN_PISTOL && d->hasammo(GUN_PISTOL)) s = GUN_PISTOL;
         else                                          s = GUN_FIST;
 
         gunselect(s, d);
@@ -110,7 +117,7 @@ namespace game
             if(name[0])
             {
                 int gun = getweapon(name);
-                if(gun >= GUN_FIST && gun <= GUN_PISTOL && gun != player1->gunselect && player1->ammo[gun]) { gunselect(gun, player1); return; }
+                if(gun >= GUN_FIST && gun <= GUN_PISTOL && gun != player1->gunselect && player1->hasammo(gun)) { gunselect(gun, player1); return; }
             } else { weaponswitch(player1); return; }
         }
         playsound(S_NOAMMO);
@@ -783,40 +790,37 @@ namespace game
     {
         const int gun = d->gunselect;
         const int capacity = guns[gun].capacity;
-        if(d->magazine[gun] >= capacity) return true;
-        const int reloadtime = lastmillis - max(d->lastaction, d->lastreload);
-        if(d->ammo[gun] && reloadtime >= guns[gun].reloaddelay)
+        if(capacity <= 0) return d->ammo[gun] > 0;
+        if(d->magazine[gun] < capacity)
         {
-            const int reload = min(capacity - d->magazine[gun], min(guns[gun].reload, d->ammo[gun]));
-            d->magazine[gun] += reload;
-            d->ammo[gun] -= reload;
-            d->lastreload = lastmillis;
+            const int reloadtime = lastmillis - max(d->lastaction, d->lastreload);
+            if(d->ammo[gun] && reloadtime >= guns[gun].reloaddelay) reload(gun, d);
         }
         return d->magazine[d->gunselect] > 0;
     }
     void shoot(fpsent *d, const vec &targ)
     {
         const int prevaction = d->lastaction;
-        if(!checkreload(d)) return;
+        const bool isloaded = checkreload(d);
         if(!checkgunwait(d)) return;
-        if(!checkcharge(d)) return;
-        const int charge = d->attackcharge ? lastmillis - d->attackcharge : 0;
-        d->attackcharge = 0;
-        d->lastaction = lastmillis;
-        d->lastattackgun = d->gunselect;
-
-        if(!d->ammo[d->gunselect])
+        if(!isloaded)
         {
-            if(d==player1)
+            if(d->attacking && d==player1 && !d->hasammo(d->gunselect))
             {
                 msgsound(S_NOAMMO, d);
+                d->lastaction = lastmillis;
                 d->gunwait = 600;
                 d->lastattackgun = -1;
                 weaponswitch(d);
             }
             return;
         }
-        if(d->gunselect) d->magazine[d->gunselect]--;
+        if(!checkcharge(d)) return;
+        const int charge = d->attackcharge ? lastmillis - d->attackcharge : 0;
+        d->attackcharge = 0;
+        d->lastaction = lastmillis;
+        d->lastattackgun = d->gunselect;
+        if(d->gunselect) d->ammosource(d->gunselect)--;
         vec from = d->o;
         vec to = targ;
 
