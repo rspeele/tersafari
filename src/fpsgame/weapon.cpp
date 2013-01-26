@@ -9,6 +9,7 @@ namespace game
     struct hitmsg
     {
         int target, lifesequence, info1, info2;
+        int headshot;
         ivec dir;
     };
     vector<hitmsg> hits;
@@ -372,7 +373,7 @@ namespace game
         loopi(min(damage/25, 40)+1) spawnbouncer(from, vel, d, BNC_GIBS);
     }
 
-    void hit(int damage, dynent *d, fpsent *at, const vec &vel, int gun, float info1, int info2 = 1)
+    void hit(int damage, dynent *d, fpsent *at, const vec &vel, int gun, float info1, int info2 = 1, bool headshot = false)
     {
         if(at==player1 && d!=at)
         {
@@ -396,6 +397,7 @@ namespace game
             h.lifesequence = f->lifesequence;
             h.info1 = int(info1*DMF);
             h.info2 = info2;
+            h.headshot = headshot;
             h.dir = f==at ? ivec(0, 0, 0) : ivec(int(vel.x*DNF), int(vel.y*DNF), int(vel.z*DNF));
             if(at==player1)
             {
@@ -415,9 +417,9 @@ namespace game
         }
     }
 
-    void hitpush(int damage, dynent *d, fpsent *at, vec &from, vec &to, int gun, int rays)
+    void hitpush(int damage, dynent *d, fpsent *at, vec &from, vec &to, int gun, int rays, bool headshot = false)
     {
-        hit(damage, d, at, vec(to).sub(from).normalize(), gun, from.dist(to), rays);
+        hit(damage, d, at, vec(to).sub(from).normalize(), gun, from.dist(to), rays, headshot);
     }
 
     float projdist(dynent *o, vec &dir, const vec &v)
@@ -697,6 +699,13 @@ namespace game
     }
 
     float intersectdist = 1e16f;
+    bool isheadshot(dynent *d, const vec &from, const vec &to, float &dist)
+    {
+        vec bottom(d->o), top(d->o);
+        bottom.z -= d->beloweye;
+        top.z += d->aboveeye;
+        return linecylinderintersect(from, to, bottom, top, d->headradius, dist);
+    }
 
     bool intersect(dynent *d, const vec &from, const vec &to, float &dist)   // if lineseg hits entity bounding box
     {
@@ -761,8 +770,10 @@ namespace game
         else if((o = intersectclosest(from, to, d, dist)))
         {
             if(d->gunselect == GUN_CG) qdam = server::cgdamage(d->o.dist(o->o)) * (d->quad.millis ? 4 : 1);
+            const bool headshot = isheadshot(o, from, to, dist);
+            if(headshot) qdam += guns[d->gunselect].bonus;
             shorten(from, to, dist);
-            hitpush(qdam, o, d, from, to, d->gunselect, 1);
+            hitpush(qdam, o, d, from, to, d->gunselect, 1, headshot);
         }
         else if(d->gunselect!=GUN_FIST && d->gunselect!=GUN_BITE) adddecal(DECAL_BULLET, to, vec(from).sub(to).normalize(), d->gunselect==GUN_RIFLE ? 3.0f : 2.0f);
     }

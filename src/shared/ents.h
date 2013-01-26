@@ -178,7 +178,9 @@ struct dynent : physent                         // animated characters, or chara
     occludequery *query;
     int occluded, lastrendered;
 
-    dynent() : ragdoll(NULL), query(NULL), occluded(0), lastrendered(0)
+    float beloweye, headradius;                 // head size
+
+    dynent() : ragdoll(NULL), query(NULL), occluded(0), lastrendered(0), beloweye(2.0f), headradius(2.0f)
     { 
         reset(); 
     }

@@ -52,6 +52,7 @@ namespace server
         int target;
         int lifesequence;
         int rays;
+        bool headshot;
         float dist;
         vec dir;
     };
@@ -2223,6 +2224,7 @@ namespace server
                     totalrays += h.rays;
                     if(totalrays>maxrays) continue;
                     int damage = gun == GUN_CG ? cgdamage(target->state.o.dist(gs.o)) : h.rays*guns[gun].damage;
+                    if(h.headshot) damage += guns[gun].bonus;
                     if(gs.quad.millis) damage *= 4;
                     dodamage(target, ci, damage, gun, h.dir);
                 }
@@ -3053,6 +3055,7 @@ namespace server
                     hit.lifesequence = getint(p);
                     hit.dist = getint(p)/DMF;
                     hit.rays = getint(p);
+                    hit.headshot = getint(p);
                     loopk(3) hit.dir[k] = getint(p)/DNF;
                 }
                 if(cq) 
@@ -3080,6 +3083,7 @@ namespace server
                     hit.lifesequence = getint(p);
                     hit.dist = getint(p)/DMF;
                     hit.rays = getint(p);
+                    hit.headshot = getint(p);
                     loopk(3) hit.dir[k] = getint(p)/DNF;
                 }
                 if(cq) cq->addevent(exp);
