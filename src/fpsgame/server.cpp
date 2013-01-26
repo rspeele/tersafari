@@ -295,7 +295,7 @@ namespace server
             return state.state==CS_ALIVE && exceeded && gamemillis > exceeded + calcpushrange();
         }
 
-        void restartgame()
+        void gamerestart()
         {
             restartvote = false;
             state.reset();
@@ -314,7 +314,7 @@ namespace server
             modevote = INT_MAX;
             clientmap[0] = '\0';
             mapcrc = 0;
-            restartgame();
+            gamerestart();
         }
 
         void reassign()
@@ -1928,7 +1928,6 @@ namespace server
         pausegame(false);
         changegamespeed(100);
         if(smode) smode->cleanup();
-        aiman::clearai();
 
         sendf(-1, 1, "ri", N_RESTARTGAME);
 
@@ -1951,12 +1950,10 @@ namespace server
         loopv(clients)
         {
             clientinfo *ci = clients[i];
-            ci->restartgame();
+            ci->gamerestart();
             ci->state.lasttimeplayed = lastmillis;
             if(m_mp(gamemode) && ci->state.state!=CS_SPECTATOR) sendspawn(ci);
         }
-
-        aiman::changemap();
 
         if(m_demo)
         {
