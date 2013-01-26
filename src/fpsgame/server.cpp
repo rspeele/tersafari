@@ -19,6 +19,9 @@ extern ENetAddress masteraddress;
 
 namespace server
 {
+    const char *TEAM_A = "lions";
+    const char *TEAM_B = "tigers";
+
     struct server_entity            // server side version of "entity" type
     {
         int type;
@@ -927,7 +930,7 @@ namespace server
 
     void autoteam()
     {
-        static const char * const teamnames[2] = {"good", "evil"};
+        static const char * const teamnames[2] = {TEAM_A, TEAM_B};
         vector<clientinfo *> team[2];
         float teamrank[2] = {0, 0};
         for(int round = 0, remaining = clients.length(); remaining>=0; round++)
@@ -973,7 +976,7 @@ namespace server
 
     const char *chooseworstteam(const char *suggest = NULL, clientinfo *exclude = NULL)
     {
-        teamrank teamranks[2] = { teamrank("good"), teamrank("evil") };
+        teamrank teamranks[2] = { teamrank(TEAM_A), teamrank(TEAM_B) };
         const int numteams = sizeof(teamranks)/sizeof(teamranks[0]);
         loopv(clients)
         {
@@ -2762,7 +2765,7 @@ namespace server
         ci->state.lasttimeplayed = lastmillis;
 
         const char *worst = m_teammode ? chooseworstteam(NULL, ci) : NULL;
-        copystring(ci->team, worst ? worst : "good", MAXTEAMLEN+1);
+        copystring(ci->team, worst ? worst : TEAM_A, MAXTEAMLEN+1);
 
         sendwelcome(ci);
         if(restorescore(ci)) sendresume(ci);

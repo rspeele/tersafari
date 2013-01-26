@@ -1,7 +1,7 @@
 #ifndef PARSEMESSAGES
 
-#define collectteambase(s) (!strcmp(s, "good") ? 1 : (!strcmp(s, "evil") ? 2 : 0))
-#define collectbaseteam(i) (i==1 ? "good" : (i==2 ? "evil" : NULL))
+#define collectteambase(s) (!strcmp(s, server::TEAM_A) ? 1 : (!strcmp(s, server::TEAM_B) ? 2 : 0))
+#define collectbaseteam(i) (i==1 ? server::TEAM_A : (i==2 ? server::TEAM_B : NULL))
 
 #ifdef SERVMODE
 struct collectservmode : servmode
