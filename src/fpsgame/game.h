@@ -392,11 +392,11 @@ struct rlinfo : guninfo
     rlinfo()
     {
         sound = S_RLFIRE;
-        attackdelay = 950;
+        attackdelay = 850;
         damage = 110;
         projspeed = 300;
         hitpush = 170;
-        exprad = 30;
+        exprad = 35;
         name = "rocketlauncher";
         file = "rocket";
     }
