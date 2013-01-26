@@ -264,7 +264,7 @@ namespace game
             }
             vec old(bnc.o);
             bool stopped = false;
-            if(bnc.bouncetype==BNC_GRENADE) stopped = bounce(&bnc, 0.8f, 0.5f, 0.8f, bnc.owner) || (bnc.lifetime -= time)<0;
+            if(bnc.bouncetype==BNC_GRENADE) stopped = bounce(&bnc, 0.75f, 0.5f, 0.8f, bnc.owner) || (bnc.lifetime -= time)<0;
             else
             {
                 // cheaper variable rate physics for debris, gibs, etc.
@@ -638,11 +638,11 @@ namespace game
             {
                 float dist = from.dist(to);
                 vec up = to;
-                up.z += dist/4;
+                up.z += dist/6;
                 if(muzzleflash && d->muzzle.x >= 0)
                     particle_flare(d->muzzle, d->muzzle, 200, PART_MUZZLE_FLASH2, 0xFFFFFF, 1.5f, d);
                 if(muzzlelight) adddynlight(hudgunorigin(gun, d->o, to, d), 20, vec(1.0f, 0.75f, 0.5f), 100, 100, DL_FLASH, 0, vec(0, 0, 0), d);
-                newbouncer(from, up, local, id, d, BNC_GRENADE, guns[gun].ttl + charge, guns[gun].projspeed);
+                newbouncer(from, up, local, id, d, BNC_GRENADE, guns[gun].ttl, guns[gun].projspeed + charge / 5);
                 break;
             }
 
@@ -788,12 +788,15 @@ namespace game
     {
         if(d==player1 || d->ai)
         {
-            // if attacking with no existing charge, set charge
-            if(d->attacking && !d->attackcharge) d->attackcharge = lastmillis;
-            // if not attacking, and no charge, don't shoot
-            if(!d->attacking && !d->attackcharge) return false;
-            // if attacking, but still charging, don't shoot
-            if(d->attacking && lastmillis - d->attackcharge < guns[d->gunselect].charge) return false;
+            if(d->attacking)
+            {
+                if(!d->attackcharge) d->attackcharge = lastmillis;
+                return lastmillis - d->attackcharge >= guns[d->gunselect].charge;
+            }
+            else
+            {
+                return d->attackcharge;
+            }
         }
         return true;
     }

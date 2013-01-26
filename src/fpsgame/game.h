@@ -420,12 +420,13 @@ struct glinfo : guninfo
     glinfo()
     {
         sound = S_FLAUNCH;
-        attackdelay = 900;
+        attackdelay = 750;
+        charge = 1400;
         damage = 90;
-        projspeed = 210;
+        projspeed = 190;
         hitpush = 250;
         exprad = 45;
-        ttl = 600;
+        ttl = 1000;
         name = "grenadelauncher";
         file = "gl";
     }
