@@ -330,20 +330,126 @@ static struct itemstat { int add, max, sound; const char *name; int icon, info; 
 #define EXP_SELFPUSH 1.5f
 #define EXP_DISTSCALE 1.5f
 
-static const struct guninfo { int sound, attackdelay, charge, damage, spread, projspeed, kickamount, range, rays, hitpush, exprad, ttl, capacity, reload, reloaddelay; const char *name, *file; } guns[NUMGUNS] =
+struct guninfo
 {
-    { S_PUNCH1,    250,    0,  50,   0,   0,  0,   14,  1,  80,  0,    0,  0, 0,    0, "fist",            "fist"  },
-    { S_SG,        800,    0,   4, 100,   0,  0, 1024, 25,  80,  0,    0,  0, 0,    0, "shotgun",         "shotg" },
-    { S_CG,         75,    0,  10,  20,   0,  0, 1024,  1,  80,  0,    0,  0, 0,    0, "chaingun",        "chaing" },
-    { S_RLFIRE,    950,    0, 110,   0, 300,  0, 1024,  1, 170, 30,    0,  0, 0,    0, "rocketlauncher",  "rocket" },
-    { S_RIFLE,    1500,    0,  90,   0,   0, 15, 2048,  1,  80,  0,    0,  0, 0,    0, "rifle",           "rifle" },
-    { S_FLAUNCH,   900, 1500,  90,   0, 210,  0, 1024,  1, 250, 45,  600,  0, 0,    0, "grenadelauncher", "gl" },
-    { S_PISTOL,    300,    0,  15,   0,   0,  0, 1024,  1,  80,  0,    0,  6, 6, 1100, "pistol",          "pistol" },
-    { S_FLAUNCH,   200,    0,  20,   0, 200,  1, 1024,  1,  80, 40,    0,  0, 0,    0, "fireball",        NULL },
-    { S_ICEBALL,   200,    0,  40,   0, 120,  1, 1024,  1,  80, 40,    0,  0, 0,    0, "iceball",         NULL },
-    { S_SLIMEBALL, 200,    0,  30,   0, 640,  1, 1024,  1,  80, 40,    0,  0, 0,    0, "slimeball",       NULL },
-    { S_PIGR1,     250,    0,  50,   0,   0,  1,   12,  1,  80,  0,    0,  0, 0,    0, "bite",            NULL },
-    { -1,            0,    0, 120,   0,   0,  0,    0,  1,  80, 40,    0,  0, 0,    0, "barrel",          NULL }
+    int sound;
+    int attackdelay;
+    int charge;
+    int damage, bonus;
+    int spread;
+    int projspeed;
+    int kickamount;
+    int range;
+    int rays;
+    int hitpush;
+    int exprad, ttl;
+    int capacity, reload, reloaddelay;
+    const char *name, *file;
+guninfo() : sound(-1), charge(0), bonus(0), spread(0),
+        projspeed(0), kickamount(0), range(1024),
+        rays(1), hitpush(80), exprad(0), ttl(0),
+        capacity(0), reload(0), reloaddelay(0) {}
+};
+struct punchinfo : guninfo
+{
+    punchinfo()
+    {
+        sound = S_PUNCH1;
+        attackdelay = 250;
+        damage = 50;
+        range = 14;
+        name = "fist";
+        file = "fist";
+    }
+};
+struct sginfo : guninfo
+{
+    sginfo()
+    {
+        sound = S_SG;
+        attackdelay = 800;
+        damage = 4;
+        spread = 100;
+        rays = 25;
+        name = "shotgun";
+        file = "shotg";
+    }
+};
+struct cginfo : guninfo
+{
+    cginfo()
+    {
+        sound = S_CG;
+        attackdelay = 75;
+        damage = 10;
+        spread = 20;
+        name = "chaingun";
+        file = "chaing";
+    }
+};
+struct rlinfo : guninfo
+{
+    rlinfo()
+    {
+        sound = S_RLFIRE;
+        attackdelay = 950;
+        damage = 110;
+        projspeed = 300;
+        hitpush = 170;
+        exprad = 30;
+        name = "rocketlauncher";
+        file = "rocket";
+    }
+};
+struct rifleinfo : guninfo
+{
+    rifleinfo()
+    {
+        sound = S_RIFLE;
+        attackdelay = 1500;
+        damage = 90, bonus = 30;
+        name = "rifle";
+        file = "rifle";
+    }
+};
+struct glinfo : guninfo
+{
+    glinfo()
+    {
+        sound = S_FLAUNCH;
+        attackdelay = 900;
+        damage = 90;
+        projspeed = 210;
+        hitpush = 250;
+        exprad = 45;
+        ttl = 600;
+        name = "grenadelauncher";
+        file = "gl";
+    }
+};
+struct pistolinfo : guninfo
+{
+    pistolinfo()
+    {
+        sound = S_PISTOL;
+        attackdelay = 300;
+        damage = 15, bonus = 15;
+        capacity = 6, reload = 6, reloaddelay = 1100;
+        name = "pistol";
+        file = "pistol";
+    }
+};
+static const guninfo guns[NUMGUNS] =
+{
+    punchinfo(),
+    sginfo(),
+    cginfo(),
+    rlinfo(),
+    rifleinfo(),
+    glinfo(),
+    pistolinfo()
+    // fireball, iceball, barrel and such are undefined for now
+    // consider SP broken anyway...
 };
 
 #include "ai.h"
