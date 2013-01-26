@@ -1923,12 +1923,12 @@ namespace game
     }
     COMMAND(stopdemo, "");
 
-    void recorddemo(int val)
+    void recorddemo()
     {
         if(remote && player1->privilege<PRIV_MASTER) return;
-        addmsg(N_RECORDDEMO, "ri", val);
+        addmsg(N_RECORDDEMO, "r");
     }
-    ICOMMAND(recorddemo, "i", (int *val), recorddemo(*val));
+    COMMAND(recorddemo, "");
 
     void cleardemos(int val)
     {

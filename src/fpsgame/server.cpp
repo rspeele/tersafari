@@ -396,6 +396,7 @@ namespace server
     bool notgotitems = true;        // true when map has changed and waiting for clients to send item
     int gamemode = 0;
     int gamemillis = 0, gamelimit = 0, nextexceeded = 0, gamespeed = 100;
+    int demostartmillis = 0;
     bool gamepaused = false, shouldstep = true;
 
     string smapname = "";
@@ -1043,7 +1044,7 @@ namespace server
     void writedemo(int chan, void *data, int len)
     {
         if(!demorecord) return;
-        int stamp[3] = { gamemillis, chan, len };
+        int stamp[3] = { gamemillis - demostartmillis, chan, len };
         lilswap(stamp, 3);
         demorecord->write(stamp, sizeof(stamp));
         demorecord->write(data, len);
@@ -1071,6 +1072,7 @@ namespace server
         sendservmsg("recording demo");
 
         demorecord = f;
+        demostartmillis = gamemillis;
 
         demoheader hdr;
         memcpy(hdr.magic, DEMO_MAGIC, sizeof(hdr.magic));
@@ -3334,15 +3336,14 @@ namespace server
 
             case N_RECORDDEMO:
             {
-                int val = getint(p);
                 if(ci->privilege < (restrictdemos ? PRIV_ADMIN : PRIV_MASTER) && !ci->local) break;
                 if(!maxdemos || !maxdemosize) 
                 {
                     sendf(ci->clientnum, 1, "ris", N_SERVMSG, "the server has disabled demo recording");
                     break;
                 }
-                demonextmatch = val!=0;
-                sendservmsgf("demo recording is %s for next match", demonextmatch ? "enabled" : "disabled");
+                setupdemorecord();
+                sendservmsgf("server demo recording started");
                 break;
             }
 
