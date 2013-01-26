@@ -432,9 +432,11 @@ namespace game
     ICOMMAND(hudp_health, "", (), intret(hudplayer()->health));
     ICOMMAND(hudp_armour, "", (), intret(hudplayer()->armour));
     ICOMMAND(hudp_armourtype, "", (), intret(hudplayer()->armourtype));
-    ICOMMAND(hudp_ammo, "i", (int *i), if(*i >= 0 && *i < NUMGUNS) intret(hudplayer()->ammo[*i]));
-    ICOMMAND(hudp_magazine, "i", (int *i), if(*i >= 0 && *i < NUMGUNS) intret(hudplayer()->magazine[*i]));
-    ICOMMAND(hudp_capacity, "i", (int *i), if(*i >= 0 && *i < NUMGUNS) intret(guns[*i].capacity));
+    ICOMMAND(hudp_survivable, "", (), intret(hudplayer()->survivable()));
+    ICOMMAND(hudp_ammo, "i", (int *i), if(validgun(*i)) intret(hudplayer()->ammo[*i]));
+    ICOMMAND(hudp_magazine, "i", (int *i), if(validgun(*i)) intret(hudplayer()->magazine[*i]));
+    ICOMMAND(hudp_capacity, "i", (int *i), if(validgun(*i)) intret(guns[*i].capacity));
+    ICOMMAND(hudp_maxammo, "i", (int *i), if(*i >= GUN_SG && *i <= GUN_PISTOL) intret(itemstats[*i - GUN_SG].max));
     ICOMMAND(hudp_gun, "", (), intret(hudplayer()->gunselect));
     ICOMMAND(hudp_speed, "", (), intret(hudplayer()->vel.magnitude2()));
     ICOMMAND(hudp_move, "", (), intret(hudplayer()->move));

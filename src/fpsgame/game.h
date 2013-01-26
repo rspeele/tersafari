@@ -54,7 +54,10 @@ struct fpsentity : extentity
 };
 
 enum { GUN_FIST = 0, GUN_SG, GUN_CG, GUN_RL, GUN_RIFLE, GUN_GL, GUN_PISTOL, GUN_FIREBALL, GUN_ICEBALL, GUN_SLIMEBALL, GUN_BITE, GUN_BARREL, NUMGUNS };
-enum { A_BLUE, A_GREEN, A_YELLOW };     // armour types... take 20/40/60 % off
+#define validgun(g) (*i >= GUN_FIST && *i < NUMGUNS)
+enum { A_BLUE, A_GREEN, A_YELLOW };     // armour types...
+#define armourinfo(a) ((a+1.0f)*0.25f)
+const int armourinfo[] = { 25, 50, 75 };
 enum { M_NONE = 0, M_SEARCH, M_HOME, M_ATTACKING, M_PAIN, M_SLEEP, M_AIMING };  // monster states
 
 enum
@@ -649,12 +652,17 @@ struct fpsstate
     // just subtract damage here, can set death, etc. later in code calling this
     int dodamage(int damage)
     {
-        int ad = damage*(armourtype+1)*25/100; // let armour absorb when possible
+        int ad = damage*armourinfo(armourtype); // let armour absorb when possible
         if(ad>armour) ad = armour;
         armour -= ad;
         damage -= ad;
         health -= damage;
         return damage;
+    }
+
+    int survivable()
+    {
+        return min((int)(health / (1.0f - armourinfo(armourtype))), health + armour);
     }
 
     int hasammo(int gun, int exclude = -1)
