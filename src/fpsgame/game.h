@@ -210,6 +210,7 @@ enum
     N_DIED, N_DAMAGE, N_HITPUSH, N_SHOTFX, N_EXPLODEFX,
     N_TRYSPAWN, N_SPAWNSTATE, N_SPAWN, N_FORCEDEATH,
     N_GUNSELECT, N_TAUNT,
+    N_RESTARTVOTE, N_RESTARTGAME,
     N_MAPCHANGE, N_MAPVOTE, N_TEAMINFO, N_ITEMSPAWN, N_ITEMPICKUP, N_ITEMACC, N_TELEPORT, N_JUMPPAD,
     N_PING, N_PONG, N_CLIENTPING,
     N_TIMEUP, N_FORCEINTERMISSION,
@@ -241,6 +242,7 @@ static const int msgsizes[] =               // size inclusive message token, 0 f
     N_DIED, 6, N_DAMAGE, 6, N_HITPUSH, 7, N_SHOTFX, 11, N_EXPLODEFX, 4,
     N_TRYSPAWN, 1, N_SPAWNSTATE, 20, N_SPAWN, 3, N_FORCEDEATH, 2,
     N_GUNSELECT, 2, N_TAUNT, 1,
+    N_RESTARTVOTE, 2, N_RESTARTGAME, 1,
     N_MAPCHANGE, 0, N_MAPVOTE, 0, N_TEAMINFO, 0, N_ITEMSPAWN, 2, N_ITEMPICKUP, 2, N_ITEMACC, 3,
     N_PING, 2, N_PONG, 2, N_CLIENTPING, 2,
     N_TIMEUP, 2, N_FORCEINTERMISSION, 1,
@@ -936,6 +938,7 @@ namespace game
     extern void getbestplayers(vector<fpsent *> &best);
     extern void getbestteams(vector<const char *> &best);
     extern void clearteaminfo();
+    extern void resetteaminfo();
     extern void setteaminfo(const char *team, int frags);
 
     // render
@@ -975,6 +978,7 @@ namespace server
     extern bool serveroption(const char *arg);
     extern bool delayspawn(int type);
     extern const int cgdamage(const float dist);
+    extern void restartgame();
 }
 
 #endif

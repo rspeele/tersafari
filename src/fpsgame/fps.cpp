@@ -662,14 +662,8 @@ namespace game
 
     VARP(showmodeinfo, 0, 1, 1);
 
-    void startgame()
+    void resetplayers()
     {
-        clearprojectiles();
-        clearbouncers();
-        clearragdolls();
-
-        clearteaminfo();
-
         // reset perma-state
         loopv(players)
         {
@@ -682,6 +676,38 @@ namespace game
             d->lifesequence = -1;
             d->respawned = d->suicided = -2;
         }
+    }
+
+    void restartgame()
+    {
+        clearprojectiles();
+        clearbouncers();
+        clearragdolls();
+
+        resetteaminfo();
+        resetplayers();
+
+        setclientmode();
+
+        intermission = false;
+        maptime = maprealtime = 0;
+        maplimit = -1;
+
+        if(cmode) cmode->setup();
+
+        showscores(false);
+        disablezoom();
+        lasthit = 0;
+    }
+
+    void startgame()
+    {
+        clearprojectiles();
+        clearbouncers();
+        clearragdolls();
+
+        clearteaminfo();
+        resetplayers();
 
         setclientmode();
 
@@ -708,7 +734,7 @@ namespace game
 
         if(identexists("mapstart")) execute("mapstart");
     }
-
+    COMMAND(startgame, "");
     void startmap(const char *name)   // called just after a map load
     {
         ai::savewaypoints();

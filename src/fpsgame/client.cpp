@@ -553,6 +553,13 @@ namespace game
     }
     ICOMMAND(map, "s", (char *name), changemap(name));
 
+    void voterestart(int favor)
+    {
+        if(!remote && favor) server::restartgame();
+        else if(player1->state!=CS_SPECTATOR || player1->privilege) addmsg(N_RESTARTVOTE, "ri", favor);
+    }
+    COMMAND(voterestart, "i");
+
     void forceedit(const char *name)
     {
         changemap(name, 1);
@@ -1264,6 +1271,14 @@ namespace game
                 if(t->state!=CS_DEAD && t->state!=CS_SPECTATOR)
                     particle_textcopy(t->abovehead(), text, PART_TEXT, 2000, 0x6496FF, 4.0f, -8);
                 conoutf(CON_TEAMCHAT, "%s:\f1 %s", colorname(t), text);
+                break;
+            }
+
+            case N_RESTARTGAME:
+            {
+                // dont startgame(), it loads map
+                entities::spawnitems();
+                startgame();
                 break;
             }
 
