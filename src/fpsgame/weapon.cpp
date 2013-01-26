@@ -770,7 +770,7 @@ namespace game
         else if((o = intersectclosest(from, to, d, dist)))
         {
             if(d->gunselect == GUN_CG) qdam = server::cgdamage(d->o.dist(o->o)) * (d->quad.millis ? 4 : 1);
-            const bool headshot = isheadshot(o, from, to, dist);
+            const bool headshot = guns[d->gunselect].bonus && isheadshot(o, from, to, dist);
             if(headshot) qdam += guns[d->gunselect].bonus;
             shorten(from, to, dist);
             hitpush(qdam, o, d, from, to, d->gunselect, 1, headshot);
