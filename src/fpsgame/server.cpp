@@ -1937,7 +1937,6 @@ namespace server
         }
 
         clearteaminfo();
-        if(m_teammode) autoteam();
 
         if(m_timed) sendf(-1, 1, "ri2", N_TIMEUP, gamemillis < gamelimit && !interm ? max((gamelimit - gamemillis)/1000, 1) : 0);
         loopv(clients)
