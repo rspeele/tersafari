@@ -295,22 +295,26 @@ namespace server
             return state.state==CS_ALIVE && exceeded && gamemillis > exceeded + calcpushrange();
         }
 
-        void mapchange()
+        void restartgame()
         {
-            mapvote[0] = 0;
-            modevote = INT_MAX;
             restartvote = false;
             state.reset();
             events.deletecontents();
-            overflow = 0;
             timesync = false;
             lastevent = 0;
             exceeded = 0;
             pushed = 0;
-            clientmap[0] = '\0';
-            mapcrc = 0;
             warned = false;
             gameclip = false;
+        }
+
+        void mapchange()
+        {
+            mapvote[0] = 0;
+            modevote = INT_MAX;
+            clientmap[0] = '\0';
+            mapcrc = 0;
+            restartgame();
         }
 
         void reassign()
@@ -887,6 +891,11 @@ namespace server
     void clearteaminfo()
     {
         teaminfos.clear();
+    }
+
+    void resetteaminfo()
+    {
+        enumerates(teaminfos, teaminfo, t, t.frags = 0);
     }
 
     bool teamhasplayers(const char *team) { loopv(clients) if(!strcmp(clients[i]->team, team)) return true; return false; }
@@ -1936,13 +1945,13 @@ namespace server
             ci->state.timeplayed += lastmillis - ci->state.lasttimeplayed;
         }
 
-        clearteaminfo();
+        resetteaminfo();
 
         if(m_timed) sendf(-1, 1, "ri2", N_TIMEUP, gamemillis < gamelimit && !interm ? max((gamelimit - gamemillis)/1000, 1) : 0);
         loopv(clients)
         {
             clientinfo *ci = clients[i];
-            ci->mapchange();
+            ci->restartgame();
             ci->state.lasttimeplayed = lastmillis;
             if(m_mp(gamemode) && ci->state.state!=CS_SPECTATOR) sendspawn(ci);
         }

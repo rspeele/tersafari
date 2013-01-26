@@ -660,6 +660,40 @@ namespace game
 
     VARP(showmodeinfo, 0, 1, 1);
 
+    void restartgame()
+    {
+        clearprojectiles();
+        clearbouncers();
+        clearragdolls();
+
+        resetteaminfo();
+
+        // reset perma-state
+        loopv(players)
+        {
+            fpsent *d = players[i];
+            d->frags = d->flags = 0;
+            d->deaths = 0;
+            d->totaldamage = 0;
+            d->totalshots = 0;
+            d->maxhealth = 100;
+            d->lifesequence = -1;
+            d->respawned = d->suicided = -2;
+        }
+
+        setclientmode();
+
+        intermission = false;
+        maptime = maprealtime = 0;
+        maplimit = -1;
+
+        if(cmode) cmode->setup();
+
+        showscores(false);
+        disablezoom();
+        lasthit = 0;
+    }
+
     void startgame()
     {
         clearprojectiles();

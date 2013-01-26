@@ -929,6 +929,7 @@ namespace game
     extern void getbestplayers(vector<fpsent *> &best);
     extern void getbestteams(vector<const char *> &best);
     extern void clearteaminfo();
+    extern void resetteaminfo();
     extern void setteaminfo(const char *team, int frags);
 
     // render
