@@ -1891,12 +1891,8 @@ namespace server
         sendpacket(-1, 1, p.finalize(), ci->clientnum);
     }
 
-    void loaditems()
+    void spawnitems()
     {
-        resetitems();
-        notgotitems = true;
-        if(m_edit || !loadents(smapname, ments, &mcrc))
-            return;
         loopv(ments) if(canspawnitem(ments[i].type))
         {
             server_entity se = { NOTUSED, 0, false };
@@ -1905,6 +1901,15 @@ namespace server
             if(m_mp(gamemode) && delayspawn(sents[i].type)) sents[i].spawntime = spawntime(sents[i].type);
             else sents[i].spawned = true;
         }
+    }
+
+    void loaditems()
+    {
+        resetitems();
+        notgotitems = true;
+        if(m_edit || !loadents(smapname, ments, &mcrc))
+            return;
+        spawnitems();
         notgotitems = false;
     }
 
@@ -1916,17 +1921,33 @@ namespace server
         if(smode) smode->cleanup();
         aiman::clearai();
 
+        sendf(-1, 1, "ri", N_RESTARTGAME);
+
         gamemillis = 0;
         interm = 0;
         nextexceeded = 0;
-
+        spawnitems();
         scores.shrink(0);
+        shouldcheckteamkills = false;
         teamkills.shrink(0);
         loopv(clients)
         {
-            clients[i]->mapchange();
-            sendspawn(clients[i]);
+            clientinfo *ci = clients[i];
+            ci->state.timeplayed += lastmillis - ci->state.lasttimeplayed;
         }
+
+        clearteaminfo();
+        if(m_teammode) autoteam();
+
+        if(m_timed) sendf(-1, 1, "ri2", N_TIMEUP, gamemillis < gamelimit && !interm ? max((gamelimit - gamemillis)/1000, 1) : 0);
+        loopv(clients)
+        {
+            clientinfo *ci = clients[i];
+            ci->mapchange();
+            ci->state.lasttimeplayed = lastmillis;
+            if(m_mp(gamemode) && ci->state.state!=CS_SPECTATOR) sendspawn(ci);
+        }
+
         aiman::changemap();
 
         if(m_demo)
@@ -2024,7 +2045,8 @@ namespace server
         loopv(clients)
         {
             clientinfo *ci = clients[i];
-            if(ci->state.state==CS_SPECTATOR && !ci->privilege && !ci->local) continue;
+            if(ci->state.aitype!=AI_NONE || (ci->state.state==CS_SPECTATOR && !ci->privilege && !ci->local))
+                continue;
             if(ci->restartvote) favor++;
             else oppose++;
         }
@@ -2100,6 +2122,7 @@ namespace server
     {
         clientinfo *ci = getinfo(sender);
         if(!ci || (ci->state.state==CS_SPECTATOR && !ci->privilege && !ci->local)) return;
+        ci->restartvote = favor;
         if(favor && (ci->local || (ci->privilege && mastermode>=MM_VETO)))
         {
             sendservmsgf("%s forced restart", colorname(ci));

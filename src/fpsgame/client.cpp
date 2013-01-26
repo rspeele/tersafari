@@ -1274,6 +1274,14 @@ namespace game
                 break;
             }
 
+            case N_RESTARTGAME:
+            {
+                // dont startgame(), it loads map
+                entities::spawnitems();
+                startgame();
+                break;
+            }
+
             case N_MAPCHANGE:
                 getstring(text, p);
                 changemapserv(text, getint(p));

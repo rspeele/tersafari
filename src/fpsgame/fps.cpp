@@ -706,7 +706,7 @@ namespace game
 
         if(identexists("mapstart")) execute("mapstart");
     }
-
+    COMMAND(startgame, "");
     void startmap(const char *name)   // called just after a map load
     {
         ai::savewaypoints();
