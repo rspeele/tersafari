@@ -579,10 +579,10 @@ namespace server
 
     vector<demofile> demos;
 
-    bool demonextmatch = false;
     stream *demotmp = NULL, *demorecord = NULL, *demoplayback = NULL;
     int nextplayback = 0, demomillis = 0;
 
+    VAR(autodemo, 0, 0, 1);
     VAR(maxdemos, 0, 5, 25);
     VAR(maxdemosize, 0, 16, 64);
     VAR(restrictdemos, 0, 1, 1);
@@ -1957,9 +1957,8 @@ namespace server
         {
             if(clients.length()) setupdemoplayback();
         }
-        else if(demonextmatch)
+        else if(autodemo && !m_edit)
         {
-            demonextmatch = false;
             setupdemorecord();
         }
 
