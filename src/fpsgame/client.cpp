@@ -553,6 +553,13 @@ namespace game
     }
     ICOMMAND(map, "s", (char *name), changemap(name));
 
+    void voterestart(int favor)
+    {
+        if(!remote && favor) server::restartgame();
+        else if(player1->state!=CS_SPECTATOR || player1->privilege) addmsg(N_RESTARTVOTE, "ri", favor);
+    }
+    COMMAND(voterestart, "i");
+
     void forceedit(const char *name)
     {
         changemap(name, 1);

@@ -223,6 +223,7 @@ namespace server
         string name, team, mapvote;
         int playermodel;
         int modevote;
+        bool restartvote;
         int privilege;
         bool connected, local, timesync;
         int gameoffset, lastevent, pushed, exceeded;
@@ -298,6 +299,7 @@ namespace server
         {
             mapvote[0] = 0;
             modevote = INT_MAX;
+            restartvote = false;
             state.reset();
             events.deletecontents();
             overflow = 0;
@@ -1905,6 +1907,39 @@ namespace server
         }
         notgotitems = false;
     }
+
+    void restartgame()
+    {
+        stopdemo();
+        pausegame(false);
+        changegamespeed(100);
+        if(smode) smode->cleanup();
+        aiman::clearai();
+
+        gamemillis = 0;
+        interm = 0;
+        nextexceeded = 0;
+
+        scores.shrink(0);
+        teamkills.shrink(0);
+        loopv(clients)
+        {
+            clients[i]->mapchange();
+            sendspawn(clients[i]);
+        }
+        aiman::changemap();
+
+        if(m_demo)
+        {
+            if(clients.length()) setupdemoplayback();
+        }
+        else if(autodemo && !m_edit)
+        {
+            setupdemorecord();
+        }
+
+        if(smode) smode->setup();
+    }
         
     void changemap(const char *s, int mode)
     {
@@ -1982,7 +2017,23 @@ namespace server
         maprotation &rot = maprotations[curmaprotation];
         changemap(rot.map, rot.findmode(gamemode));
     }
-    
+
+    void checkrestartvotes()
+    {
+        int favor = 0, oppose = 0;
+        loopv(clients)
+        {
+            clientinfo *ci = clients[i];
+            if(ci->state.state==CS_SPECTATOR && !ci->privilege && !ci->local) continue;
+            if(ci->restartvote) favor++;
+            else oppose++;
+        }
+        if(favor > oppose)
+        {
+            restartgame();
+        }
+    }
+
     struct votecount
     {
         char *map;
@@ -1991,7 +2042,7 @@ namespace server
         votecount(char *s, int n) : map(s), mode(n), count(0) {}
     };
 
-    void checkvotes(bool force = false)
+    void checkmapvotes(bool force = false)
     {
         vector<votecount> votes;
         int maxvotes = 0;
@@ -2045,7 +2096,23 @@ namespace server
         changemap(map, mode);
     }
 
-    void vote(const char *map, int reqmode, int sender)
+    void restartvote(int favor, int sender)
+    {
+        clientinfo *ci = getinfo(sender);
+        if(!ci || (ci->state.state==CS_SPECTATOR && !ci->privilege && !ci->local)) return;
+        if(favor && (ci->local || (ci->privilege && mastermode>=MM_VETO)))
+        {
+            sendservmsgf("%s forced restart", colorname(ci));
+            restartgame();
+        }
+        else
+        {
+            sendservmsgf("%s %ss restarting the game", colorname(ci), favor ? "favor" : "oppose");
+            checkrestartvotes();
+        }
+    }
+
+    void mapvote(const char *map, int reqmode, int sender)
     {
         clientinfo *ci = getinfo(sender);
         if(!ci || (ci->state.state==CS_SPECTATOR && !ci->privilege && !ci->local) || (!ci->local && !m_mp(reqmode))) return;
@@ -2068,7 +2135,7 @@ namespace server
         else
         {
             sendservmsgf("%s suggests %s on map %s (select map to vote)", colorname(ci), modename(reqmode), map[0] ? map : "[new map]");
-            checkvotes();
+            checkmapvotes();
         }
     }
 
@@ -2397,7 +2464,7 @@ namespace server
             {
                 if(demorecord) enddemorecord();
                 interm = -1;
-                checkvotes(true);
+                checkmapvotes(true);
             }
         }
 
@@ -3158,12 +3225,19 @@ namespace server
                 break;
             }
 
+            case N_RESTARTVOTE:
+            {
+                int favor = getint(p);
+                restartvote(favor, sender);
+                break;
+            }
+
             case N_MAPVOTE:
             {
                 getstring(text, p);
                 filtertext(text, text, false);
                 int reqmode = getint(p);
-                vote(text, reqmode, sender);
+                mapvote(text, reqmode, sender);
                 break;
             }
 
