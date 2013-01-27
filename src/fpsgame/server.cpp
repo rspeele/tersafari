@@ -303,6 +303,7 @@ namespace server
             restartvote = false;
             state.reset();
             events.deletecontents();
+            overflow = 0;
             timesync = false;
             lastevent = 0;
             exceeded = 0;
