@@ -247,10 +247,11 @@ namespace game
         if(player1->clientnum>=0) c2sinfo();   // do this last, to reduce the effective frame lag
     }
 
+    ICOMMAND(arena, "i", (int *a), { player1->arena = *a; });
     void spawnplayer(fpsent *d)   // place at random spawn
     {
         if(cmode) cmode->pickspawn(d);
-        else findplayerspawn(d, d==player1 && respawnent>=0 ? respawnent : -1);
+        else findplayerspawn(d, d==player1 && respawnent>=0 ? respawnent : -1, d->arena);
         spawnstate(d);
         if(d==player1)
         {
