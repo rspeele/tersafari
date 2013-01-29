@@ -830,6 +830,8 @@ namespace server
         return cname[cidx];
     }
 
+    void sendspawn(clientinfo *ci); // forward declare so visible in servmode
+
     struct servmode
     {
         virtual ~servmode() {}
