@@ -94,17 +94,20 @@ namespace game
     #include "capture.h"
     #include "ctf.h"
     #include "collect.h"
+    #include "elimination.h"
 
     clientmode *cmode = NULL;
     captureclientmode capturemode;
     ctfclientmode ctfmode;
     collectclientmode collectmode;
+    elimclientmode eliminationmode;
 
     void setclientmode()
     {
         if(m_capture) cmode = &capturemode;
         else if(m_ctf) cmode = &ctfmode;
         else if(m_collect) cmode = &collectmode;
+        else if(m_elimination) cmode = &eliminationmode;
         else cmode = NULL;
     }
 

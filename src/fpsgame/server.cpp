@@ -864,10 +864,12 @@ namespace server
     #include "capture.h"
     #include "ctf.h"
     #include "collect.h"
+    #include "elimination.h"
 
     captureservmode capturemode;
     ctfservmode ctfmode;
     collectservmode collectmode;
+    elimservmode eliminationmode;
     servmode *smode = NULL;
 
     bool canspawnitem(int type) { return !m_noitems && (type>=I_SHELLS && type<=I_QUAD && (!m_noammo || type<I_SHELLS || type>I_CARTRIDGES)); }
@@ -2036,6 +2038,7 @@ namespace server
         if(m_capture) smode = &capturemode;
         else if(m_ctf) smode = &ctfmode;
         else if(m_collect) smode = &collectmode;
+        else if(m_elimination) smode = &eliminationmode;
         else smode = NULL;
 
         if(m_timed && smapname[0]) sendf(-1, 1, "ri2", N_TIMEUP, gamemillis < gamelimit && !interm ? max((gamelimit - gamemillis)/1000, 1) : 0);
