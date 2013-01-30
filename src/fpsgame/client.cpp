@@ -1793,6 +1793,7 @@ namespace game
             #include "capture.h"
             #include "ctf.h"
             #include "collect.h"
+            #include "elimination.h"
             #undef PARSEMESSAGES
 
             case N_ANNOUNCE:
