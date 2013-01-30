@@ -30,9 +30,20 @@ namespace game
         intret(f ? f->clientnum : -1);
     });
 
+
+    const bool canfollow(const fpsent *const spec, const fpsent *const player)
+    {
+        return spec && player &&
+            player->state != CS_SPECTATOR &&
+            (spec->state == CS_SPECTATOR ||
+             (spec->state == CS_DEAD &&
+              player->state != CS_DEAD &&
+              isteam(spec->team, player->team)));
+    }
+
 	void follow(char *arg)
     {
-        if(arg[0] ? player1->state==CS_SPECTATOR : following>=0)
+        if(arg[0] ? player1->state==CS_SPECTATOR||player1->state==CS_DEAD : following>=0)
         {
             following = arg[0] ? parseplayer(arg) : -1;
             if(following==player1->clientnum) following = -1;
@@ -44,21 +55,20 @@ namespace game
 
     void nextfollow(int dir)
     {
-        if(player1->state!=CS_SPECTATOR || clients.empty())
+        if(clients.empty());
+        else if(player1->state==CS_SPECTATOR || player1->state==CS_DEAD)
         {
-            stopfollowing();
-            return;
-        }
-        int cur = following >= 0 ? following : (dir < 0 ? clients.length() - 1 : 0);
-        loopv(clients)
-        {
-            cur = (cur + dir + clients.length()) % clients.length();
-            if(clients[cur] && clients[cur]->state!=CS_SPECTATOR)
+            int cur = following >= 0 ? following : (dir < 0 ? clients.length() - 1 : 0);
+            loopv(clients)
             {
-                if(following<0) conoutf("follow on");
-                following = cur;
-                followdir = dir;
-                return;
+                cur = (cur + dir + clients.length()) % clients.length();
+                if(clients[cur] && canfollow(player1, clients[cur]))
+                {
+                    if(following<0) conoutf("follow on");
+                    following = cur;
+                    followdir = dir;
+                    return;
+                }
             }
         }
         stopfollowing();
@@ -114,7 +124,7 @@ namespace game
 
     fpsent *followingplayer()
     {
-        if(player1->state!=CS_SPECTATOR || following<0) return NULL;
+        if((player1->state!=CS_SPECTATOR&&player1->state!=CS_DEAD) || following<0) return NULL;
         fpsent *target = getclient(following);
         if(target && target->state!=CS_SPECTATOR) return target;
         return NULL;
