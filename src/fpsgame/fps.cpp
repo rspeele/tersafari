@@ -325,8 +325,10 @@ namespace game
     const char *currentbroadcast()
     {
         static const char *nothing = "";
+        static string buffer;
         if(lastmillis >= broadcastexpire) return nothing;
-        else return broadcastmsg;
+        formatstring(buffer)(broadcastmsg, (broadcastexpire - lastmillis) / 1000);
+        return buffer;
     }
 
     // custom HUD

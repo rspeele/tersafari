@@ -34,9 +34,13 @@ namespace server
     struct serverevent // server-wide event scheduled for a specific time
     {
         int millis;
-        void (*flush)();
+        void (*action)();
+        void flush() { (action)(); }
     };
-    void addevent(void (*action)(), int future = 0);
+    namespace serverevents
+    {
+        void add(void (*action)(), int future = 0);
+    }
 
     struct clientinfo;
 
@@ -422,23 +426,30 @@ namespace server
     int mastermode = MM_OPEN, mastermask = MM_PRIVSERV;
     stream *mapdata = NULL;
 
-    vector<serverevent> serverevents;
-    void addevent(void (*action)(), int future)
+    namespace serverevents
     {
-        serverevent &ev = serverevents.add();
-        ev.millis = gamemillis + future;
-        ev.flush = action;
-    }
-    void checkserverevents()
-    {
-        loopv(serverevents)
+        vector<serverevent> events;
+        void add(void (*action)(), int future)
         {
-            serverevent &ev = serverevents[i];
-            if(gamemillis > ev.millis)
+            serverevent &ev = events.add();
+            ev.millis = gamemillis + future;
+            ev.action = action;
+        }
+        void process()
+        {
+            loopv(events)
             {
-                ev.flush();
-                serverevents.remove(i--);
+                serverevent &ev = events[i];
+                if(gamemillis > ev.millis)
+                {
+                    if(ev.millis > 0) ev.flush();
+                    events.remove(i--);
+                }
             }
+        }
+        void invalidate()
+        {
+            loopv(events) events[i].millis = -1;
         }
     }
 
@@ -800,6 +811,12 @@ namespace server
     {
          defvformatstring(s, fmt, fmt);
          sendf(-1, 1, "ris", N_SERVMSG, s);
+    }
+    void sendbroadcast(const char *s, int duration = 1000) { sendf(-1, 1, "ri2s", N_BROADCAST, duration, s); }
+    void sendbroadcastf(const char *fmt, int duration, ...)
+    {
+        defvformatstring(s, duration, fmt);
+        sendbroadcast(s, duration);
     }
 
     void resetitems()
@@ -1994,7 +2011,7 @@ namespace server
         pausegame(false);
         changegamespeed(100);
         if(smode) smode->cleanup();
-        serverevents.setsize(0);
+        serverevents::invalidate();
 
         sendf(-1, 1, "ri", N_RESTARTGAME);
 
@@ -2040,7 +2057,7 @@ namespace server
         pausegame(false);
         changegamespeed(100);
         if(smode) smode->cleanup();
-        serverevents.setsize(0);
+        serverevents::invalidate();
         aiman::clearai();
 
         gamemode = mode;
@@ -2125,7 +2142,8 @@ namespace server
         }
         if(favor > oppose)
         {
-            restartgame();
+            sendbroadcast("restarting game in %ds", 5000);
+            serverevents::add(&restartgame, 5000);
         }
     }
 
@@ -2454,7 +2472,7 @@ namespace server
             ci->state.updatepowerup(curtime);
             flushevents(ci, gamemillis);
         }
-        checkserverevents();
+        serverevents::process();
     }
 
     void cleartimedevents(clientinfo *ci)
