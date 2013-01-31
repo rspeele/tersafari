@@ -1678,6 +1678,14 @@ namespace game
                 conoutf("%s", text);
                 break;
 
+            case N_BROADCAST:
+            {
+                int duration = getint(p);
+                getstring(text, p);
+                showbroadcast(text, duration);
+                break;
+            }
+
             case N_SENDDEMOLIST:
             {
                 int demos = getint(p);

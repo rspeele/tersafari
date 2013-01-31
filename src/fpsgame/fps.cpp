@@ -314,6 +314,21 @@ namespace game
         return !((fpsent *)d)->lasttaunt || lastmillis-((fpsent *)d)->lasttaunt>=1000;
     }
 
+    // broadcast messages from server
+    char broadcastmsg[MAXTRANS];
+    int broadcastexpire = 0;
+    void showbroadcast(const char *message, int duration)
+    {
+        copystring(broadcastmsg, message, MAXTRANS);
+        broadcastexpire = lastmillis + duration;
+    }
+    const char *currentbroadcast()
+    {
+        static const char *nothing = "";
+        if(lastmillis >= broadcastexpire) return nothing;
+        else return broadcastmsg;
+    }
+
     // custom HUD
     namespace hudstate
     {
@@ -443,7 +458,7 @@ namespace game
     ICOMMAND(hud_text, "s", (char *str), hudstate::text(str));
     ICOMMAND(hud_xpct, "i", (int *pct), intret(hudstate::scrw * (float)(*pct / 100.0f)));
     ICOMMAND(hud_ypct, "i", (int *pct), intret(hudstate::scrh * (float)(*pct / 100.0f)));
-    // getting info about hud player
+    // getting info for hud
     ICOMMAND(hudp_health, "", (), intret(hudplayer()->health));
     ICOMMAND(hudp_armour, "", (), intret(hudplayer()->armour));
     ICOMMAND(hudp_armourtype, "", (), intret(hudplayer()->armourtype));
@@ -458,6 +473,7 @@ namespace game
     ICOMMAND(hudp_strafe, "", (), intret(hudplayer()->strafe));
     ICOMMAND(hudp_jumping, "", (), intret(hudplayer()->jumping));
     ICOMMAND(hudp_attacking, "", (), intret(hudplayer()->attacking));
+    ICOMMAND(hudp_broadcast, "", (), result(currentbroadcast()));
     VARP(showkeys, 0, 0, 1);
     // clock
     VARP(clockup, 0, 0, 1);
@@ -1012,18 +1028,27 @@ namespace game
             }
         }
 
-        if(!*customhud && m_timed && maplimit >= 0)
+        if(!*customhud)
         {
-            int secs = clockmillis()/1000, mins = secs/60;
-            secs %= 60;
-            defformatstring(sn)("%d:%02d", mins, secs);
-            text_bounds(sn, tw, th);
-            glPushMatrix();
             const float middlex = w*900.0f/h;
-            const float clocksize = 2.0f;
-            glScalef(clocksize, clocksize, 1.0f);
-            draw_text(sn, middlex/clocksize - tw / 2, 0);
-            glPopMatrix();
+            if(m_timed && maplimit >= 0)
+            {
+                int secs = clockmillis()/1000, mins = secs/60;
+                secs %= 60;
+                defformatstring(sn)("%d:%02d", mins, secs);
+                text_bounds(sn, tw, th);
+                glPushMatrix();
+                const float clocksize = 2.0f;
+                glScalef(clocksize, clocksize, 1.0f);
+                draw_text(sn, middlex/clocksize - tw/2, 0);
+                glPopMatrix();
+            }
+            const char *message = currentbroadcast();
+            if(*message)
+            {
+                text_bounds(message, tw, th);
+                draw_text(message, middlex - tw/2, 200);
+            }
         }
 
         fpsent *d = hudplayer();

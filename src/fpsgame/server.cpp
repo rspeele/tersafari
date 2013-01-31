@@ -31,9 +31,16 @@ namespace server
 
     static const int DEATHMILLIS = 300;
 
+    struct serverevent // server-wide event scheduled for a specific time
+    {
+        int millis;
+        void (*flush)();
+    };
+    void addevent(void (*action)(), int future = 0);
+
     struct clientinfo;
 
-    struct gameevent
+    struct gameevent // client-specific event
     {
         virtual ~gameevent() {}
 
@@ -414,6 +421,26 @@ namespace server
     enet_uint32 lastsend = 0;
     int mastermode = MM_OPEN, mastermask = MM_PRIVSERV;
     stream *mapdata = NULL;
+
+    vector<serverevent> serverevents;
+    void addevent(void (*action)(), int future)
+    {
+        serverevent &ev = serverevents.add();
+        ev.millis = gamemillis + future;
+        ev.flush = action;
+    }
+    void checkserverevents()
+    {
+        loopv(serverevents)
+        {
+            serverevent &ev = serverevents[i];
+            if(gamemillis > ev.millis)
+            {
+                ev.flush();
+                serverevents.remove(i--);
+            }
+        }
+    }
 
     vector<uint> allowedips;
     vector<ban> bannedips;
@@ -1967,6 +1994,7 @@ namespace server
         pausegame(false);
         changegamespeed(100);
         if(smode) smode->cleanup();
+        serverevents.setsize(0);
 
         sendf(-1, 1, "ri", N_RESTARTGAME);
 
@@ -2012,6 +2040,7 @@ namespace server
         pausegame(false);
         changegamespeed(100);
         if(smode) smode->cleanup();
+        serverevents.setsize(0);
         aiman::clearai();
 
         gamemode = mode;
@@ -2425,6 +2454,7 @@ namespace server
             ci->state.updatepowerup(curtime);
             flushevents(ci, gamemillis);
         }
+        checkserverevents();
     }
 
     void cleartimedevents(clientinfo *ci)
