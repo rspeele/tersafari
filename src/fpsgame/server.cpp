@@ -2050,6 +2050,14 @@ namespace server
 
         if(smode) smode->setup();
     }
+
+    void restartgamein(const int seconds)
+    {
+        const int future = seconds * 1000;
+        sendbroadcast("restarting game in %ds", future);
+        serverevents::add(&restartgame, future);
+    }
+
         
     void changemap(const char *s, int mode)
     {
@@ -2142,8 +2150,7 @@ namespace server
         }
         if(favor > oppose)
         {
-            sendbroadcast("restarting game in %ds", 5000);
-            serverevents::add(&restartgame, 5000);
+            restartgamein(5);
         }
     }
 
@@ -2211,7 +2218,7 @@ namespace server
         if(favor && (ci->local || (ci->privilege && mastermode>=MM_VETO)))
         {
             sendservmsgf("%s forced restart", colorname(ci));
-            restartgame();
+            restartgamein(5);
         }
         else
         {
