@@ -2139,19 +2139,14 @@ namespace server
 
     void checkrestartvotes()
     {
-        int favor = 0, oppose = 0;
         loopv(clients)
         {
             clientinfo *ci = clients[i];
             if(ci->state.aitype!=AI_NONE || (ci->state.state==CS_SPECTATOR && !ci->privilege && !ci->local))
                 continue;
-            if(ci->restartvote) favor++;
-            else oppose++;
+            if(!ci->restartvote) return;
         }
-        if(favor > oppose)
-        {
-            restartgamein(5);
-        }
+        restartgamein(5);
     }
 
     struct votecount
