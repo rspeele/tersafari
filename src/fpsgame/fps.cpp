@@ -30,6 +30,10 @@ namespace game
         intret(f ? f->clientnum : -1);
     });
 
+    bool spectating(physent *d)
+    {
+        return d->state==CS_SPECTATOR || (m_elimination && d->state==CS_DEAD);
+    }
 
     const bool canfollow(const fpsent *const spec, const fpsent *const player)
     {
@@ -43,7 +47,7 @@ namespace game
 
 	void follow(char *arg)
     {
-        if(arg[0] ? player1->state==CS_SPECTATOR||player1->state==CS_DEAD : following>=0)
+        if(arg[0] ? spectating(player1) : following>=0)
         {
             following = arg[0] ? parseplayer(arg) : -1;
             if(following==player1->clientnum) following = -1;
@@ -56,7 +60,7 @@ namespace game
     void nextfollow(int dir)
     {
         if(clients.empty());
-        else if(player1->state==CS_SPECTATOR || player1->state==CS_DEAD)
+        else if(spectating(player1))
         {
             int cur = following >= 0 ? following : (dir < 0 ? clients.length() - 1 : 0);
             loopv(clients)

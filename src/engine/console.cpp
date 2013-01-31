@@ -463,7 +463,7 @@ void execbind(keym &k, bool isdown)
         if(!mainmenu)
         {
             if(editmode) state = keym::ACTION_EDITING;
-            else if(player->state==CS_SPECTATOR||player->state==CS_DEAD) state = keym::ACTION_SPECTATOR;
+            else if(game::spectating(player)) state = keym::ACTION_SPECTATOR;
         }
         char *&action = k.actions[state][0] ? k.actions[state] : k.actions[keym::ACTION_DEFAULT];
         keyaction = action;
