@@ -11,7 +11,7 @@ GLenum bloomformat = 0, hdrformat = 0;
 bool hdrfloat = false;
 int aow = -1, aoh = -1;
 GLuint aofbo[3] = { 0, 0, 0 }, aotex[3] = { 0, 0, 0 }, aonoisetex = 0;
-glmatrixf eyematrix, worldmatrix, linearworldmatrix;
+glmatrixf eyematrix, worldmatrix, linearworldmatrix, screenmatrix;
 
 extern int bloomsize, bloomprec;
 extern int ati_pf_bug;
@@ -666,22 +666,40 @@ void readhdr(int w, int h, GLenum format, GLenum type, void *dst, GLenum target,
     hdrclear = 3;
 }
 
-void loadhdrshaders(bool luma)
+void loadhdrshaders(int aa)
 {
-    if(luma)
+    switch(aa)
     {
-        useshaderbyname("hdrtonemapluma");
-        useshaderbyname("hdrnopluma");
+        case AA_LUMA:
+            useshaderbyname("hdrtonemapluma");
+            useshaderbyname("hdrnopluma");
+            break;
+        case AA_VELOCITY:
+            useshaderbyname("hdrtonemapvelocity");
+            useshaderbyname("hdrnopvelocity");
+            break;
+        default:
+            break;
     }
 }
 
-void processhdr(GLuint outfbo, bool luma)
+void processhdr(GLuint outfbo, int aa)
 {
     if(!hdr)
     {
         glBindFramebuffer_(GL_FRAMEBUFFER_EXT, outfbo);
         glViewport(0, 0, vieww, viewh);
-        if(luma) SETSHADER(hdrnopluma); else SETSHADER(hdrnop);
+        switch(aa)
+        {
+            case AA_LUMA: SETSHADER(hdrnopluma); break;
+            case AA_VELOCITY:
+                SETSHADER(hdrnopvelocity);
+                glActiveTexture_(GL_TEXTURE3_ARB);
+                setaavelocityparams();
+                glActiveTexture_(GL_TEXTURE0_ARB);
+                break;
+            default: SETSHADER(hdrnop); break;
+        }
         glBindTexture(GL_TEXTURE_RECTANGLE_ARB, hdrtex);
         screenquad(vieww, viewh);
         return;
@@ -801,7 +819,17 @@ void processhdr(GLuint outfbo, bool luma)
 
     glBindFramebuffer_(GL_FRAMEBUFFER_EXT, outfbo);
     glViewport(0, 0, vieww, viewh);
-    if(luma) SETSHADER(hdrtonemapluma); else SETSHADER(hdrtonemap);
+    switch(aa)
+    {
+        case AA_LUMA: SETSHADER(hdrtonemapluma); break;
+        case AA_VELOCITY:
+            SETSHADER(hdrtonemapvelocity);
+            glActiveTexture_(GL_TEXTURE3_ARB);
+            setaavelocityparams();
+            glActiveTexture_(GL_TEXTURE0_ARB);
+            break;
+        default: SETSHADER(hdrtonemap); break;
+    }       
     glBindTexture(GL_TEXTURE_RECTANGLE_ARB, hdrtex);
     glActiveTexture_(GL_TEXTURE1_ARB);
     glBindTexture(GL_TEXTURE_RECTANGLE_ARB, b0tex);
@@ -3377,7 +3405,8 @@ void rendertransparent()
         }
         else
         {
-            maskgbuffer("cng");
+            bool aamask = maskedaa();
+            maskgbuffer(aamask ? "cn" : "cng");
             bool scissor = sx1 > -1 || sy1 > -1 || sx2 < 1 || sy2 < 1;
             if(scissor)
             {
@@ -3388,6 +3417,13 @@ void rendertransparent()
             }
             glClearColor(0, 0, 0, 0);
             glClear(GL_COLOR_BUFFER_BIT);
+            if(aamask)
+            {
+                maskgbuffer("g");
+                glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_FALSE);
+                glClear(GL_COLOR_BUFFER_BIT);
+                glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+            } 
             if(scissor) glDisable(GL_SCISSOR_TEST);
             maskgbuffer("cngd");
         }
@@ -3486,21 +3522,21 @@ void preparegbuffer()
     glClear((minimapping < 2 ? GL_DEPTH_BUFFER_BIT : 0)|(gcolorclear ? GL_COLOR_BUFFER_BIT : 0)|(minimapping < 2 && ((gdepthstencil && hasDS) || gstencil) ? GL_STENCIL_BUFFER_BIT : 0));
     if(gdepthformat && gdepthclear) maskgbuffer("cngd");
 
-    glmatrixf screenmatrix;
-    screenmatrix.identity();
-    screenmatrix.scale(2.0f/vieww, 2.0f/viewh, 2.0f);
-    screenmatrix.translate(-1.0f, -1.0f, -1.0f);
-    eyematrix.mul(invprojmatrix, screenmatrix);
+    glmatrixf invscreenmatrix;
+    invscreenmatrix.identity();
+    invscreenmatrix.scale(2.0f/vieww, 2.0f/viewh, 2.0f);
+    invscreenmatrix.translate(-1.0f, -1.0f, -1.0f);
+    eyematrix.mul(invprojmatrix, invscreenmatrix);
     if(minimapping)
     {
-        linearworldmatrix.mul(invmvpmatrix, screenmatrix);
+        linearworldmatrix.mul(invmvpmatrix, invscreenmatrix);
         worldmatrix = linearworldmatrix;
     }
     else
     {
-        linearworldmatrix.mul(invprojmatrix, screenmatrix);
+        linearworldmatrix.mul(invprojmatrix, invscreenmatrix);
         float xscale = linearworldmatrix.v[0], yscale = linearworldmatrix.v[5], xoffset = linearworldmatrix.v[12], yoffset = linearworldmatrix.v[13], zscale = linearworldmatrix.v[14];
-        GLfloat depthmatrix[16] =
+        float depthmatrix[16] =
         {
             xscale/zscale,  0,              0, 0,
             0,              yscale/zscale,  0, 0,
@@ -3509,8 +3545,13 @@ void preparegbuffer()
         };
         linearworldmatrix.mul(invmvmatrix.v, depthmatrix);
         if(gdepthformat) worldmatrix = linearworldmatrix;
-        else worldmatrix.mul(invmvpmatrix, screenmatrix);
+        else worldmatrix.mul(invmvpmatrix, invscreenmatrix);
     }
+
+    screenmatrix.identity();
+    screenmatrix.scale(0.5f*vieww, 0.5f*viewh, 0.5f);
+    screenmatrix.translate(0.5f*vieww, 0.5f*viewh, 0.5f);
+    screenmatrix.mul(mvpmatrix);
 
     GLOBALPARAM(viewsize, (vieww, viewh, 1.0f/vieww, 1.0f/viewh));
     GLOBALPARAM(gdepthscale, (eyematrix.v[14], eyematrix.v[11], eyematrix.v[15]));

@@ -1,16 +1,173 @@
 #include "engine.h"
 
+extern int tqaamovemask, tqaapack;
+
+int tqaaframe = 0;
+GLuint tqaaprevtex = 0, tqaacurtex = 0, tqaaprevmask = 0, tqaacurmask = 0, tqaafbo[4] = { 0, 0, 0, 0 };
+glmatrixf tqaaprevmvp;
+
+void loadtqaashaders()
+{
+    loadhdrshaders(!tqaapack ? AA_VELOCITY : AA_UNUSED);
+
+    if(tqaamovemask) useshaderbyname("tqaamaskmovement");
+    if(tqaapack) useshaderbyname("tqaapackvelocity");
+    useshaderbyname(tqaamovemask ? "tqaaresolvemasked" : "tqaaresolve");
+}
+
+void setuptqaa(int w, int h)
+{
+    if(!tqaaprevtex) glGenTextures(1, &tqaaprevtex);
+    if(!tqaacurtex) glGenTextures(1, &tqaacurtex);
+    createtexture(tqaaprevtex, w, h, NULL, 3, 1, GL_RGBA8, GL_TEXTURE_RECTANGLE_ARB);
+    createtexture(tqaacurtex, w, h, NULL, 3, 1, GL_RGBA8, GL_TEXTURE_RECTANGLE_ARB);
+    if(tqaamovemask)
+    {
+        if(!tqaaprevmask) glGenTextures(1, &tqaaprevmask);
+        if(!tqaacurmask) glGenTextures(1, &tqaacurmask);
+        int maskw = (w+3)/4, maskh = (h+3)/4;
+        createtexture(tqaaprevmask, maskw, maskh, NULL, 3, 1, GL_RGBA8, GL_TEXTURE_RECTANGLE_ARB);
+        createtexture(tqaacurmask, maskw, maskh, NULL, 3, 1, GL_RGBA8, GL_TEXTURE_RECTANGLE_ARB);
+    }
+    loopi(tqaamovemask ? 4 : 2)
+    {
+        if(!tqaafbo[i]) glGenFramebuffers_(1, &tqaafbo[i]);
+        glBindFramebuffer_(GL_FRAMEBUFFER_EXT, tqaafbo[i]);
+        GLuint tex = 0;
+        switch(i)
+        {
+            case 0: tex = tqaacurtex; break;
+            case 1: tex = tqaaprevtex; break;
+            case 2: tex = tqaacurmask; break;
+            case 3: tex = tqaaprevmask; break;
+        }
+        glFramebufferTexture2D_(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_RECTANGLE_ARB, tex, 0);
+        if(glCheckFramebufferStatus_(GL_FRAMEBUFFER_EXT) != GL_FRAMEBUFFER_COMPLETE_EXT)
+            fatal("failed allocating TQAA buffer!");
+    }
+    glBindFramebuffer_(GL_FRAMEBUFFER_EXT, 0);
+
+    tqaaprevmvp.identity();
+
+    loadtqaashaders();
+}
+
+void cleanuptqaa()
+{
+    if(tqaaprevtex) { glDeleteTextures(1, &tqaaprevtex); tqaaprevtex = 0; }
+    if(tqaacurtex) { glDeleteTextures(1, &tqaacurtex); tqaacurtex = 0; }
+    if(tqaaprevmask) { glDeleteTextures(1, &tqaaprevmask); tqaaprevmask = 0; }
+    if(tqaacurmask) { glDeleteTextures(1, &tqaacurmask); tqaacurmask = 0; }
+    loopi(4) if(tqaafbo[i]) { glDeleteFramebuffers_(1, &tqaafbo[i]); tqaafbo[i] = 0; }
+
+    tqaaframe = 0;
+}
+
+VARFP(tqaa, 0, 0, 1, cleanupaa());
+VARF(tqaapack, 0, 0, 1, cleanupaa());
+FVAR(tqaareproject, 0, 170, 1e6f);
+VARF(tqaamovemask, 0, 1, 1, cleanuptqaa());
+VAR(tqaaquincunx, 0, 1, 1);
+
+void setaavelocityparams()
+{
+    glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gdepthtex);
+    glMatrixMode(GL_TEXTURE);
+    glmatrixf reproject;
+    reproject.mul(tqaaframe ? tqaaprevmvp : screenmatrix, worldmatrix);
+    if(tqaaframe) reproject.jitter(tqaaframe&1 ? 0.5f : -0.5f, tqaaframe&1 ? 0.5f : -0.5f);
+    glLoadMatrixf(reproject.v);
+    glMatrixMode(GL_MODELVIEW);
+    float maxvel = sqrtf(vieww*vieww + viewh*viewh)/tqaareproject;
+    LOCALPARAM(maxvelocity, (maxvel, 1/maxvel));
+}
+
+void packtqaa(GLuint packfbo)
+{
+    if(tqaamovemask)
+    {
+        int maskw = (vieww+3)/4, maskh = (viewh+3)/4;
+        glBindFramebuffer_(GL_FRAMEBUFFER_EXT, tqaafbo[2]);
+        glViewport(0, 0, maskw, maskh);
+        glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gglowtex);
+        SETSHADER(tqaamaskmovement);
+        screenquad(maskw*4, maskh*4);
+        glViewport(0, 0, vieww, viewh);
+    }
+
+    if(tqaapack)
+    {
+        glBindFramebuffer_(GL_FRAMEBUFFER_EXT, packfbo);
+        glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_TRUE);
+        SETSHADER(tqaapackvelocity);
+        setaavelocityparams();
+        screenquad(vieww, viewh);
+        glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    }
+}
+
+void resolvetqaa(GLuint outfbo)
+{
+    glBindFramebuffer_(GL_FRAMEBUFFER_EXT, outfbo);
+    glBindTexture(GL_TEXTURE_RECTANGLE_ARB, tqaacurtex);
+    glActiveTexture_(GL_TEXTURE1_ARB);
+    glBindTexture(GL_TEXTURE_RECTANGLE_ARB, tqaaframe ? tqaaprevtex : tqaacurtex);
+    glActiveTexture_(GL_TEXTURE2_ARB);
+    glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gdepthtex);
+    if(tqaamovemask)
+    {
+       glActiveTexture_(GL_TEXTURE3_ARB);
+       glBindTexture(GL_TEXTURE_RECTANGLE_ARB, tqaacurmask);
+       glActiveTexture_(GL_TEXTURE4_ARB);
+       glBindTexture(GL_TEXTURE_RECTANGLE_ARB, tqaaframe ? tqaaprevmask : tqaacurmask);
+    }
+    glActiveTexture_(GL_TEXTURE0_ARB);
+    if(tqaamovemask) SETSHADER(tqaaresolvemasked); else SETSHADER(tqaaresolve);
+    float maxvel = sqrtf(vieww*vieww + viewh*viewh)/tqaareproject;
+    LOCALPARAM(maxvelocity, (maxvel, 1/maxvel));
+    if(!tqaaquincunx) LOCALPARAM(quincunx, (0.0f, 0.0f, 0.0f, 0.0f));
+    else if(tqaaframe&1) LOCALPARAM(quincunx, (0.5f, 0.5f, 0.0f, 0.0f));
+    else LOCALPARAM(quincunx, (0.0f, 0.0f, 0.5f, 0.5f));
+    screenquad(vieww, viewh, 0.25f*vieww, 0.25f*viewh);
+
+    swap(tqaafbo[0], tqaafbo[1]);
+    swap(tqaacurtex, tqaaprevtex);
+    tqaaprevmvp = screenmatrix;
+    tqaaframe++;
+    if(tqaamovemask)
+    {
+        swap(tqaafbo[2], tqaafbo[3]);
+        swap(tqaacurmask, tqaaprevmask);
+    }
+}
+
+void dotqaa(GLuint outfbo = 0)
+{
+    timer *tqaatimer = begintimer("tqaa");
+
+    packtqaa(tqaafbo[0]);
+    resolvetqaa(outfbo);
+
+    endtimer(tqaatimer);
+}
+
 GLuint fxaafbo = 0;
 
-extern int fxaaquality;
+extern int fxaaquality, fxaagreenluma;
 
 static Shader *fxaashader = NULL;
 
 void loadfxaashaders()
 {
-    loadhdrshaders(true);
-    defformatstring(fxaaname)("fxaa%d", fxaaquality);
-    fxaashader = generateshader(fxaaname, "fxaashaders %d", fxaaquality);
+    loadhdrshaders(tqaa && !tqaapack ? AA_VELOCITY : (!fxaagreenluma ? AA_LUMA : AA_UNUSED));
+
+    string opts;
+    int optslen = 0;
+    if(fxaagreenluma || (tqaa && !tqaapack)) opts[optslen++] = 'g';
+    opts[optslen] = '\0';
+
+    defformatstring(fxaaname)("fxaa%d%s", fxaaquality, opts);
+    fxaashader = generateshader(fxaaname, "fxaashaders %d \"%s\"", fxaaquality, opts);
 }
 
 void clearfxaashaders()
@@ -40,12 +197,15 @@ void cleanupfxaa()
 
 VARFP(fxaa, 0, 0, 1, cleanupfxaa());
 VARFP(fxaaquality, 0, 1, 3, cleanupfxaa());
+VARFP(fxaagreenluma, 0, 0, 1, cleanupfxaa());
 
 void dofxaa(GLuint outfbo = 0)
 {
     timer *fxaatimer = begintimer("fxaa");
 
-    glBindFramebuffer_(GL_FRAMEBUFFER_EXT, outfbo);
+    if(tqaa) packtqaa(fxaafbo);
+
+    glBindFramebuffer_(GL_FRAMEBUFFER_EXT, tqaa ? tqaafbo[0] : outfbo);
     fxaashader->set();
     glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gcolortex);
     glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -54,28 +214,39 @@ void dofxaa(GLuint outfbo = 0)
     glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
+    if(tqaa) resolvetqaa(outfbo);
+
     endtimer(fxaatimer);
 }
-
+ 
 GLuint smaaareatex = 0, smaasearchtex = 0, smaafbo[3] = { 0, 0, 0 };
 
-extern int smaaquality;
+extern int smaaquality, smaagreenluma, smaacoloredge;
 
 static Shader *smaalumaedgeshader = NULL, *smaacoloredgeshader = NULL, *smaablendweightshader = NULL, *smaaneighborhoodshader = NULL;
 
 void loadsmaashaders()
 {
-    loadhdrshaders(true);
-    defformatstring(lumaedgename)("SMAALumaEdgeDetection%d", smaaquality);
-    defformatstring(coloredgename)("SMAAColorEdgeDetection%d", smaaquality);
-    defformatstring(blendweightname)("SMAABlendingWeightCalculation%d", smaaquality);
-    defformatstring(neighborhoodname)("SMAANeighborhoodBlending%d", smaaquality);
+    loadhdrshaders(tqaa && !tqaapack ? AA_VELOCITY : (!smaagreenluma && !smaacoloredge ? AA_LUMA : AA_UNUSED));
+
+    string opts;
+    int optslen = 0;
+    if(smaagreenluma || (tqaa && !tqaapack)) opts[optslen++] = 'g';
+    if(tqaa) opts[optslen++] = 't';
+    opts[optslen] = '\0';
+
+    defformatstring(lumaedgename)("SMAALumaEdgeDetection%d%s", smaaquality, opts);
+    defformatstring(coloredgename)("SMAAColorEdgeDetection%d%s", smaaquality, opts);
+    defformatstring(blendweightname)("SMAABlendingWeightCalculation%d%s", smaaquality, opts);
+    defformatstring(neighborhoodname)("SMAANeighborhoodBlending%d%s", smaaquality, opts);
     smaalumaedgeshader = lookupshaderbyname(lumaedgename);
     smaacoloredgeshader = lookupshaderbyname(coloredgename);
     smaablendweightshader = lookupshaderbyname(blendweightname);
     smaaneighborhoodshader = lookupshaderbyname(neighborhoodname);
+
     if(smaalumaedgeshader && smaacoloredgeshader && smaablendweightshader && smaaneighborhoodshader) return;
-    generateshader(NULL, "smaashaders %d", smaaquality);
+
+    generateshader(NULL, "smaashaders %d \"%s\"", smaaquality, opts);
     smaalumaedgeshader = lookupshaderbyname(lumaedgename);
     if(!smaalumaedgeshader) smaalumaedgeshader = nullshader;
     smaacoloredgeshader = lookupshaderbyname(coloredgename);
@@ -149,6 +320,7 @@ void cleanupsmaa()
 VARFP(smaa, 0, 0, 1, cleanupsmaa());
 VARFP(smaaquality, 0, 2, 3, cleanupsmaa());
 VARP(smaacoloredge, 0, 0, 1);
+VARFP(smaagreenluma, 0, 0, 1, cleanupsmaa());
 VAR(smaadepthmask, 0, 1, 1);
 VAR(smaastencil, 0, 1, 1);
 VAR(debugsmaa, 0, 0, 5);
@@ -200,6 +372,8 @@ void dosmaa(GLuint outfbo = 0)
     glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gcolortex);
     screenquad(vieww, viewh);
 
+    if(tqaa) packtqaa(smaafbo[0]);
+
     glBindFramebuffer_(GL_FRAMEBUFFER_EXT, smaafbo[2]);
     if(smaadepthmask)
     {
@@ -213,6 +387,7 @@ void dosmaa(GLuint outfbo = 0)
     }
     glClear(GL_COLOR_BUFFER_BIT);
     smaablendweightshader->set();
+    LOCALPARAM(subsamples, (tqaa ? (tqaaframe&1) + 1 : 0)); 
     glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gnormaltex);
     glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -233,7 +408,7 @@ void dosmaa(GLuint outfbo = 0)
     }
     else if(smaastencil && ((gdepthstencil && hasDS) || gstencil)) glDisable(GL_STENCIL_TEST);
 
-    glBindFramebuffer_(GL_FRAMEBUFFER_EXT, outfbo);
+    glBindFramebuffer_(GL_FRAMEBUFFER_EXT, tqaa ? tqaafbo[0] : outfbo);
     smaaneighborhoodshader->set();
     glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gcolortex);
     glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -245,6 +420,8 @@ void dosmaa(GLuint outfbo = 0)
     glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
+    if(tqaa) resolvetqaa(outfbo);
+
     endtimer(smaatimer);
 }
 
@@ -252,13 +429,31 @@ void setupaa(int w, int h)
 {
     if(smaa) { if(!smaafbo[0]) setupsmaa(w, h); }
     else if(fxaa) { if(!fxaafbo) setupfxaa(w, h); }
+
+    if(tqaa && !tqaafbo[0]) setuptqaa(w, h);
 }
 
-void doaa(GLuint outfbo, void (*resolve)(GLuint, bool))
+void jitteraa()
 {
-    if(smaa) { resolve(smaafbo[0], !smaacoloredge); dosmaa(outfbo); }
-    else if(fxaa) { resolve(fxaafbo, true); dofxaa(outfbo); }
-    else resolve(outfbo, false);
+    if(tqaa)
+    {
+        float x = tqaaframe&1 ? 0.25f : -0.25f, y = tqaaframe&1 ? 0.25f : -0.25f;
+        if(tqaaquincunx) { x += 0.25f; y += 0.25f; }
+        projmatrix.jitter(x*2.0f/vieww, y*2.0f/viewh);
+    }
+}
+     
+bool maskedaa()
+{
+    return tqaa && tqaamovemask;
+}
+   
+void doaa(GLuint outfbo, void (*resolve)(GLuint, int))
+{
+    if(smaa) { resolve(smaafbo[0], tqaa && !tqaapack ? AA_VELOCITY : (!smaagreenluma && !smaacoloredge ? AA_LUMA : AA_UNUSED)); dosmaa(outfbo); }
+    else if(fxaa) { resolve(fxaafbo, tqaa && !tqaapack ? AA_VELOCITY : (!fxaagreenluma ? AA_LUMA : AA_UNUSED)); dofxaa(outfbo); }
+    else if(tqaa) { resolve(tqaafbo[0], !tqaapack ? AA_VELOCITY : AA_UNUSED); dotqaa(outfbo); }
+    else resolve(outfbo, AA_UNUSED);
 }
 
 bool debugaa()
@@ -272,5 +467,6 @@ void cleanupaa()
 {
     cleanupsmaa();
     cleanupfxaa();
+    cleanuptqaa();
 }
 

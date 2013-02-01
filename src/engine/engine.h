@@ -491,10 +491,12 @@ static inline bool bbinsidespot(const vec &origin, const vec &dir, int spot, con
     return sphereinsidespot(dir, spot, center.sub(origin), radius.magnitude());
 }
 
-extern glmatrixf worldmatrix;
+extern glmatrixf worldmatrix, screenmatrix;
 
 extern int gw, gh, gdepthformat, gstencil, gdepthstencil;
 extern GLuint gdepthtex, gcolortex, gnormaltex, gglowtex, gdepthrb, gstencilrb;
+
+enum { AA_UNUSED = 0, AA_LUMA, AA_VELOCITY };
 
 extern void cleanupgbuffer();
 extern void initgbuffer();
@@ -506,8 +508,8 @@ extern void shademinimap(const vec &color = vec(0, 0, 0));
 extern void shademodelpreview(int x, int y, int w, int h, bool background = true, bool scissor = false);
 extern void rendertransparent();
 extern void renderao();
-extern void loadhdrshaders(bool luma = false);
-extern void processhdr(GLuint outfbo = 0, bool luma = false);
+extern void loadhdrshaders(int aa = AA_UNUSED);
+extern void processhdr(GLuint outfbo = 0, int aa = AA_UNUSED);
 extern void readhdr(int w, int h, GLenum format, GLenum type, void *dst, GLenum target = 0, GLuint tex = 0);
 extern void setupframe(int w, int h);
 extern void setupgbuffer(int w, int h);
@@ -519,7 +521,10 @@ extern void cleanuplights();
 // aa
 
 extern void setupaa(int w, int h);
-extern void doaa(GLuint outfbo, void (*resolve)(GLuint, bool));
+extern void jitteraa();
+extern bool maskedaa();
+extern void setaavelocityparams();
+extern void doaa(GLuint outfbo, void (*resolve)(GLuint, int));
 extern bool debugaa();
 extern void cleanupaa();
 
