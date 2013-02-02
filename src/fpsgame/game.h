@@ -521,9 +521,21 @@ struct fpsstate
         boost.update(curtime, this);
     }
 
-    void baseammo(int gun, int k = 2, int scale = 1)
+    void baseammo(int gun)
     {
-        ammo[gun] = (itemstats[gun-GUN_SG].add*k)/scale;
+        float factor = 1.0f;
+        switch(gun)
+        {
+        case GUN_SG:
+        case GUN_RL:
+        case GUN_GL:
+            factor = 2.f/3.f;
+            break;
+        case GUN_RIFLE:
+            factor = 1.f/3.f;
+            break;
+        }
+        ammo[gun] = itemstats[gun-GUN_SG].max * factor;
     }
 
     void addammo(int gun, int k = 1, int scale = 1)
@@ -619,10 +631,9 @@ struct fpsstate
         else if(m_efficiency)
         {
             armourtype = A_GREEN;
-            armour = 100;
-            loopi(5) baseammo(i+1);
+            armour = 125;
+            loopi(6) baseammo(i+1);
             gunselect = GUN_CG;
-            ammo[GUN_CG] /= 2;
         }
         else if(m_ctf || m_collect)
         {
