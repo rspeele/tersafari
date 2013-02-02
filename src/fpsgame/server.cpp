@@ -3496,6 +3496,7 @@ namespace server
                     spinfo->state.lasttimeplayed = lastmillis;
                     aiman::addclient(spinfo);
                     if(spinfo->clientmap[0] || spinfo->mapcrc) checkmaps();
+                    if(smode) smode->entergame(spinfo);
                 }
                 sendf(-1, 1, "ri3", N_SPECTATOR, spectator, val);
                 if(!val && !hasmap(spinfo)) rotatemap(true);

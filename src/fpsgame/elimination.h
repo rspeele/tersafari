@@ -110,6 +110,10 @@ struct elimclientmode : clientmode
             sendstring(sc.team, p);
         }
     }
+    void entergame(clientinfo *ci)
+    {
+        checkround = true;
+    }
     void leavegame(clientinfo *ci, bool disconnecting = false)
     {
         checkround = true;
@@ -120,7 +124,7 @@ struct elimclientmode : clientmode
     }
     bool canspawn(clientinfo *ci, bool connecting)
     {
-        return clients.length() <= 2;
+        return numclients(-1, true, false) <= 1;
     }
     bool canchangeteam(clientinfo *ci, const char *oldteam, const char *newteam)
     {
