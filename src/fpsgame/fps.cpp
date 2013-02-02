@@ -156,7 +156,7 @@ namespace game
     bool detachcamera()
     {
         fpsent *d = hudplayer();
-        return d->state==CS_DEAD && followingplayer() == NULL;
+        return d->state==CS_DEAD;
     }
 
     bool collidecamera()
