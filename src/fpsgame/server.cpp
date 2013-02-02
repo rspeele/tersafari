@@ -2517,8 +2517,8 @@ namespace server
             nextboost -= curtime;
             if (nextboost <= 0)
             {
-                s->health = min(s->maxhealth, s->health + 5);
-                nextboost = 750;
+                s->health = min(s->maxhealth, s->health + 1);
+                nextboost = 150;
             }
         }
         return over;
