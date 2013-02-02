@@ -413,6 +413,7 @@ struct rifleinfo : guninfo
         sound = S_RIFLE;
         attackdelay = 1500;
         damage = 90, bonus = 30;
+        kickamount = 15;
         name = "rifle";
         file = "rifle";
     }
