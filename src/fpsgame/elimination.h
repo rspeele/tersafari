@@ -1,5 +1,6 @@
 #ifndef PARSEMESSAGES
 #ifdef SERVMODE
+bool betweenrounds = false;
 struct elimservmode : servmode
 #else
 struct elimclientmode : clientmode
@@ -43,8 +44,12 @@ struct elimclientmode : clientmode
     {
         loopv(scores) teamscores.add(teamscore(scores[i].team, scores[i].total));
     }
+
     void setup()
     {
+#ifdef SERVMODE
+        betweenrounds = false;
+#endif
         scores.setsize(0);
     }
     void cleanup()
@@ -61,6 +66,7 @@ struct elimclientmode : clientmode
         score &sc = makescore(winner);
         sc.total++;
         sendf(-1, 1, "ri2s", N_ROUNDSCORE, sc.total, sc.team);
+        betweenrounds = true;
     }
     static void startround()
     {
@@ -72,6 +78,7 @@ struct elimclientmode : clientmode
                 sendspawn(clients[i]);
             }
         }
+        betweenrounds = false;
     }
     bool checkround;
     struct winstate
@@ -135,6 +142,7 @@ struct elimclientmode : clientmode
     {
         if(!checkround) return;
         checkround = false;
+        if(betweenrounds) return;
         winstate won = winningteam();
         if(won.over)
         {
