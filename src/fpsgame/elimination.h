@@ -139,56 +139,7 @@ struct elimclientmode : clientmode
             serverevents::add(&startround, 5000);
         }
     }
-    // server interface
-        // virtual ~servmode() {}
-
-        // virtual void entergame(clientinfo *ci) {}
-        // virtual void leavegame(clientinfo *ci, bool disconnecting = false) {}
-
-        // virtual void moved(clientinfo *ci, const vec &oldpos, bool oldclip, const vec &newpos, bool newclip) {}
-        // virtual bool canspawn(clientinfo *ci, bool connecting = false) { return true; }
-        // virtual void spawned(clientinfo *ci) {}
-        // virtual int fragvalue(clientinfo *victim, clientinfo *actor)
-        // {
-        //     if(victim==actor || isteam(victim->team, actor->team)) return -1;
-        //     return 1;
-        // }
-        // virtual void died(clientinfo *victim, clientinfo *actor) {}
-        // virtual bool canchangeteam(clientinfo *ci, const char *oldteam, const char *newteam) { return true; }
-        // virtual void changeteam(clientinfo *ci, const char *oldteam, const char *newteam) {}
-        // virtual void initclient(clientinfo *ci, packetbuf &p, bool connecting) {}
-        // virtual void update() {}
-        // virtual void cleanup() {}
-        // virtual void setup() {}
-        // virtual void newmap() {}
-        // virtual void intermission() {}
-        // virtual bool hidefrags() { return false; }
-        // virtual int getteamscore(const char *team) { return 0; }
-        // virtual void getteamscores(vector<teamscore> &scores) {}
-        // virtual bool extinfoteam(const char *team, ucharbuf &p) { return false; }
 #else
-    // client interface
-        // virtual ~clientmode() {}
-
-        // virtual void preload() {}
-        // virtual int clipconsole(int w, int h) { return 0; }
-        // virtual void drawhud(fpsent *d, int w, int h) {}
-        // virtual void rendergame() {}
-        // virtual void respawned(fpsent *d) {}
-        // virtual void setup() {}
-        // virtual void checkitems(fpsent *d) {}
-        // virtual int respawnwait(fpsent *d) { return 0; }
-        // virtual void pickspawn(fpsent *d) { findplayerspawn(d); }
-        // virtual void senditems(packetbuf &p) {}
-        // virtual void removeplayer(fpsent *d) {}
-        // virtual void gameover() {}
-        // virtual bool hidefrags() { return false; }
-        // virtual int getteamscore(const char *team) { return 0; }
-        // virtual void getteamscores(vector<teamscore> &scores) {}
-        // virtual void aifind(fpsent *d, ai::aistate &b, vector<ai::interest> &interests) {}
-        // virtual bool aicheck(fpsent *d, ai::aistate &b) { return false; }
-        // virtual bool aidefend(fpsent *d, ai::aistate &b) { return false; }
-        // virtual bool aipursue(fpsent *d, ai::aistate &b) { return false; }
 #endif
 
 };
