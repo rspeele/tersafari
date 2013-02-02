@@ -649,6 +649,10 @@ struct fpsstate
             ammo[GUN_PISTOL] = 24;
             ammo[GUN_GL] = 1;
         }
+        loopi(NUMGUNS)
+        {
+            if(ammo[i]) magazine[i] = guns[i].capacity;
+        }
     }
 
     // just subtract damage here, can set death, etc. later in code calling this
