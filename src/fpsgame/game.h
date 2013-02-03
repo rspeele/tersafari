@@ -976,6 +976,7 @@ namespace server
     extern const char *TEAM_B;
     extern const char *modename(int n, const char *unknown = "unknown");
     extern const char *mastermodename(int n, const char *unknown = "unknown");
+    extern bool wantentity(int type);
     extern void startintermission();
     extern void stopdemo();
     extern void forcemap(const char *map, int mode);

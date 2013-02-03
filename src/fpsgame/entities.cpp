@@ -346,10 +346,11 @@ namespace entities
     void putitems(packetbuf &p)            // puts items in network stream and also spawns them locally
     {
         putint(p, N_ITEMLIST);
-        loopv(ents) if(ents[i]->type>=I_SHELLS && ents[i]->type<=I_QUAD && (!m_noammo || ents[i]->type<I_SHELLS || ents[i]->type>I_CARTRIDGES))
+        loopv(ents) if(server::wantentity(ents[i]->type))
         {
             putint(p, i);
             putint(p, ents[i]->type);
+            loopj(3) putint(p, (int)(ents[i]->o[j] * DMF));
         }
         putint(p, -1);
     }

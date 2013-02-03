@@ -1117,7 +1117,7 @@ void findplayerspawn(dynent *d, int forceent, int tag, int arena)   // place at 
                 d->yaw = entities::getents()[attempt]->attr1;
                 entinmap(d);
                 break;
-            }    
+            }
         }
     }
     else if(arena != 0) // fall back to default arena

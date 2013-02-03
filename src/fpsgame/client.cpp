@@ -1398,6 +1398,8 @@ namespace game
             {
                 int scn = getint(p);
                 fpsent *s = getclient(scn);
+                vec pos;
+                loopk(3) pos[k] = getint(p)/DMF;
                 if(!s) { parsestate(NULL, p); break; }
                 if(s->state==CS_DEAD && s->lastpain) saveragdoll(s);
                 if(s==player1)
@@ -1408,8 +1410,8 @@ namespace game
                 s->respawn();
                 parsestate(s, p);
                 s->state = CS_ALIVE;
-                if(cmode) cmode->pickspawn(s);
-                else findplayerspawn(s, -1, 0, s->arena);
+                s->o = pos;
+                entinmap(s);
                 if(s == player1)
                 {
                     showscores(false);
