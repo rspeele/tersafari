@@ -1007,8 +1007,8 @@ namespace server
                 bestdist = close;
             }
         }
-        // if we found spawns, but there were no suitable players to compare against
-        // pick a random spawn
+        // if we found spawns, but there were no suitable players to
+        // compare against, then pick a random spawn
         if(best < 0 && starts)
         {
             int iter = rnd(sents.length());
@@ -1976,6 +1976,7 @@ namespace server
             {
                 gamestate &gs = ci->state;
                 spawnstate(ci);
+                pickplayerspawn(ci);
                 putint(p, N_SPAWNSTATE);
                 putint(p, ci->clientnum);
                 loopk(3) putint(p, (int)(ci->state.o[k]*DMF));
