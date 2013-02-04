@@ -888,7 +888,9 @@ namespace server
         return cname[cidx];
     }
 
-    void sendspawn(clientinfo *ci); // forward declare so visible in servmode
+    // forward declare so visible in servmode
+    int pickplayerspawn(clientinfo *ci, int attr2 = -1);
+    void sendspawn(clientinfo *ci);
 
     struct servmode
     {
@@ -905,6 +907,7 @@ namespace server
             if(victim==actor || isteam(victim->team, actor->team)) return -1;
             return 1;
         }
+        virtual int pickspawn(clientinfo *ci) { return -1; }
         virtual void died(clientinfo *victim, clientinfo *actor) {}
         virtual bool canchangeteam(clientinfo *ci, const char *oldteam, const char *newteam) { return true; }
         virtual void changeteam(clientinfo *ci, const char *oldteam, const char *newteam) {}
@@ -992,7 +995,7 @@ namespace server
     }
 
     // default spawn selection - pick a spawn that is far from other players, particularly enemies
-    int pickplayerspawn(clientinfo *ci)
+    int pickplayerspawn(clientinfo *ci, int attr2)
     {
         int best = -1;
         float bestdist = 0.0f;
@@ -1001,7 +1004,7 @@ namespace server
         loopv(sents)
         {
             server_entity &sent = sents[i];
-            if(sent.type != PLAYERSTART) continue;
+            if(sent.type != PLAYERSTART || (attr2 >= 0 && sent.attr2 != attr2)) continue;
             starts++;
             bool any = false;
             float close = 1e10f;
@@ -1029,7 +1032,7 @@ namespace server
             {
                 loopv(sents)
                 {
-                    if(sents[i].type == PLAYERSTART && iter-- < 0)
+                    if(sents[i].type == PLAYERSTART && (attr2 < 0 || sents[i].attr2 == attr2) && iter-- < 0)
                     {
                         best = i;
                         break;
@@ -1037,6 +1040,7 @@ namespace server
                 }
             } while (best < 0 && iter >= 0);
         }
+        if(best >= 0) ci->state.o = sents[best].o;
         return best;
     }
 
@@ -1849,7 +1853,7 @@ namespace server
     {
         gamestate &gs = ci->state;
         spawnstate(ci);
-        int spawn = pickplayerspawn(ci);
+        int spawn = smode ? smode->pickspawn(ci) : pickplayerspawn(ci);
         sendf(ci->ownernum, 1, "ri9vv", N_SPAWNSTATE, ci->clientnum, spawn,
               gs.lifesequence,
               gs.health, gs.maxhealth,
@@ -1988,7 +1992,7 @@ namespace server
             {
                 gamestate &gs = ci->state;
                 spawnstate(ci);
-                int spawn = pickplayerspawn(ci);
+                int spawn = smode ? smode->pickspawn(ci) : pickplayerspawn(ci);
                 putint(p, N_SPAWNSTATE);
                 putint(p, ci->clientnum);
                 putint(p, spawn);

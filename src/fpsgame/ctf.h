@@ -247,6 +247,12 @@ struct ctfclientmode : clientmode
         }
     }
 
+    int pickspawn(clientinfo *ci)
+    {
+        //FIXME: implement pickholdspawn for server-side
+        return pickplayerspawn(ci, m_hold ? 0 : ctfteamflag(ci->team));
+    }
+
     void setup()
     {
         reset(false);
@@ -963,12 +969,6 @@ struct ctfclientmode : clientmode
             if(entinmap(d, true)) return true;
         }
         return false;
-    }
-
-    void pickspawn(fpsent *d)
-    {
-        if(!m_hold || !pickholdspawn(d))
-            findplayerspawn(d, -1, m_hold ? 0 : ctfteamflag(d->team));
     }
 
 	bool aihomerun(fpsent *d, ai::aistate &b)

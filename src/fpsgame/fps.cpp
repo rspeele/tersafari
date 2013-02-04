@@ -262,10 +262,8 @@ namespace game
     }
 
     ICOMMAND(arena, "i", (int *a), { player1->arena = *a; });
-    void spawnplayer(fpsent *d)   // place at random spawn
+    void spawnplayer(fpsent *d)   // spawn state
     {
-        if(cmode) cmode->pickspawn(d);
-        else findplayerspawn(d, d==player1 && respawnent>=0 ? respawnent : -1, d->arena);
         spawnstate(d);
         if(d==player1)
         {
@@ -778,7 +776,7 @@ namespace game
         else findplayerspawn(player1, -1);
         entities::resetspawns();
         copystring(clientmap, name ? name : "");
-        
+
         sendmapinfo();
     }
 

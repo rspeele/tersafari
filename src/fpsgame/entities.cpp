@@ -351,6 +351,11 @@ namespace entities
             putint(p, i);
             putint(p, ents[i]->type);
             loopj(3) putint(p, (int)(ents[i]->o[j] * DMF));
+            putint(p, ents[i]->attr1);
+            putint(p, ents[i]->attr2);
+            putint(p, ents[i]->attr3);
+            putint(p, ents[i]->attr4);
+            putint(p, ents[i]->attr5);
         }
         putint(p, -1);
     }

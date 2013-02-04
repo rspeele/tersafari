@@ -174,6 +174,11 @@ struct collectclientmode : clientmode
 
     collectservmode() : notgotbases(false) {}
 
+    int pickspawn(clientinfo *ci)
+    {
+        return pickplayerspawn(ci, collectteambase(ci->team));
+    }
+
     void reset(bool empty)
     {
         resetbases();
@@ -749,11 +754,6 @@ struct collectclientmode : clientmode
     int respawnwait(fpsent *d)
     {
         return max(0, RESPAWNSECS-(lastmillis-d->lastpain)/1000);
-    }
-
-    void pickspawn(fpsent *d)
-    {
-        findplayerspawn(d, -1, collectteambase(d->team));
     }
 
     bool aicheck(fpsent *d, ai::aistate &b)

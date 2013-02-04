@@ -842,7 +842,6 @@ namespace game
         virtual void setup() {}
         virtual void checkitems(fpsent *d) {}
         virtual int respawnwait(fpsent *d) { return 0; }
-        virtual void pickspawn(fpsent *d) { findplayerspawn(d); }
         virtual void senditems(packetbuf &p) {}
         virtual void removeplayer(fpsent *d) {}
         virtual void gameover() {}
