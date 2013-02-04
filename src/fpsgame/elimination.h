@@ -60,6 +60,10 @@ struct elimclientmode : clientmode
         return true;
     }
 #ifdef SERVMODE
+    int pickspawn(clientinfo *ci)
+    {
+        return pickplayerspawn(ci);
+    }
     void endround(const char *winner)
     {
         if(!winner) return;

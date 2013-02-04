@@ -1011,7 +1011,7 @@ namespace server
             loopvj(clients)
             {
                 clientinfo *oi = clients[j];
-                if(oi == ci || oi->state.state != CS_ALIVE) continue;
+                if(oi == ci || oi->state.state == CS_SPECTATOR || oi->state.health <= 0) continue;
                 float dist = oi->state.o.dist(sent.o);
                 if(isteam(ci->team, oi->team)) dist *= 2; // don't worry as much about spawning near teammates
                 close = min(close, dist);
