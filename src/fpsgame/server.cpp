@@ -22,12 +22,25 @@ namespace server
     const char *TEAM_A = "lions";
     const char *TEAM_B = "tigers";
 
-    struct server_entity            // server side version of "entity" type
+    struct server_entity : entity // server side version of "entity" type
     {
-        int type;
         int spawntime;
         char spawned;
-        vec o;
+        server_entity(uchar atype, int aspawntime, char aspawned) : spawntime(aspawntime), spawned(aspawned)
+        {
+            type = atype;
+        }
+        server_entity &operator=(const entity &e)
+        {
+            o = e.o;
+            type = e.type;
+            attr1 = e.attr1;
+            attr2 = e.attr2;
+            attr3 = e.attr3;
+            attr4 = e.attr4;
+            attr5 = e.attr5;
+            return *this;
+        }
     };
 
     static const int DEATHMILLIS = 300;
@@ -979,7 +992,7 @@ namespace server
     }
 
     // default spawn selection - pick a spawn that is far from other players, particularly enemies
-    void pickplayerspawn(clientinfo *ci)
+    int pickplayerspawn(clientinfo *ci)
     {
         int best = -1;
         float bestdist = 0.0f;
@@ -1024,7 +1037,7 @@ namespace server
                 }
             } while (best < 0 && iter >= 0);
         }
-        if(best >= 0) ci->state.o = sents[best].o;
+        return best;
     }
 
     static hashset<teaminfo> teaminfos;
@@ -1836,9 +1849,8 @@ namespace server
     {
         gamestate &gs = ci->state;
         spawnstate(ci);
-        pickplayerspawn(ci);
-        sendf(ci->ownernum, 1, "ri4i7vv", N_SPAWNSTATE, ci->clientnum,
-              (int)(gs.o.x*DMF), (int)(gs.o.y*DMF), (int)(gs.o.z*DMF),
+        int spawn = pickplayerspawn(ci);
+        sendf(ci->ownernum, 1, "ri9vv", N_SPAWNSTATE, ci->clientnum, spawn,
               gs.lifesequence,
               gs.health, gs.maxhealth,
               gs.armour, gs.armourtype,
@@ -1976,10 +1988,10 @@ namespace server
             {
                 gamestate &gs = ci->state;
                 spawnstate(ci);
-                pickplayerspawn(ci);
+                int spawn = pickplayerspawn(ci);
                 putint(p, N_SPAWNSTATE);
                 putint(p, ci->clientnum);
-                loopk(3) putint(p, (int)(ci->state.o[k]*DMF));
+                putint(p, spawn);
                 sendstate(gs, p);
                 gs.lastspawn = gamemillis;
             }
@@ -2050,10 +2062,9 @@ namespace server
     {
         loopv(ments) if(wantentity(ments[i].type))
         {
-            server_entity se = { NOTUSED, 0, false };
+            server_entity se(NOTUSED, 0, false);
             while(sents.length()<=i) sents.add(se);
-            sents[i].type = ments[i].type;
-            sents[i].o = ments[i].o;
+            sents[i] = ments[i];
             if(canspawnitem(ments[i].type))
             {
                 if(m_mp(gamemode) && delayspawn(sents[i].type)) sents[i].spawntime = spawntime(sents[i].type);
@@ -3127,18 +3138,10 @@ namespace server
                 loopk(3) p.get();
                 int mag = p.get(); if(flags&(1<<3)) mag |= p.get()<<8;
                 int dir = p.get(); dir |= p.get()<<8;
-                // vec vel = vec((dir%360)*RAD, (clamp(dir/360, 0, 180)-90)*RAD).mul(mag/DVELF);
-                // if(flags&(1<<4))
-                // {
-                //     p.get(); if(flags&(1<<5)) p.get();
-                //     if(flags&(1<<6)) loopk(2) p.get();
-                // }
                 if(cp)
                 {
                     if((!ci->local || demorecord || hasnonlocalclients()) && (cp->state.state==CS_ALIVE || cp->state.state==CS_EDITING))
                     {
-                        // if(!ci->local && !m_edit && max(vel.magnitude2(), (float)fabs(vel.z)) >= 180)
-                        //     cp->setexceeded();
                         cp->position.setsize(0);
                         while(curmsg<p.length()) cp->position.add(p.buf[curmsg++]);
                     }
@@ -3436,16 +3439,21 @@ namespace server
                    !notgotitems ||
                    strcmp(ci->clientmap, smapname))
                 {
-                    while(getint(p)>=0 && !p.overread()) loopk(4) getint(p);
+                    while(getint(p)>=0 && !p.overread()) loopk(9) getint(p);
                     break;
                 }
                 int n;
                 while((n = getint(p))>=0 && n<MAXENTS && !p.overread())
                 {
-                    server_entity se = { NOTUSED, 0, false };
+                    server_entity se(NOTUSED, 0, false);
                     while(sents.length()<=n) sents.add(se);
                     sents[n].type = getint(p);
                     loopk(3) sents[n].o[k] = getint(p)/DMF;
+                    sents[n].attr1 = getint(p);
+                    sents[n].attr2 = getint(p);
+                    sents[n].attr3 = getint(p);
+                    sents[n].attr4 = getint(p);
+                    sents[n].attr5 = getint(p);
                     if(canspawnitem(sents[n].type))
                     {
                         if(m_mp(gamemode) && delayspawn(sents[n].type)) sents[n].spawntime = spawntime(sents[n].type);
@@ -3458,18 +3466,23 @@ namespace server
 
             case N_EDITENT:
             {
+                entity ent;
                 int i = getint(p);
-                loopk(3) getint(p);
-                int type = getint(p);
-                loopk(5) getint(p);
+                loopk(3) ent.o[k] = getint(p)/DMF;
+                ent.type = getint(p);
+                ent.attr1 = getint(p);
+                ent.attr2 = getint(p);
+                ent.attr3 = getint(p);
+                ent.attr4 = getint(p);
+                ent.attr5 = getint(p);
                 if(!ci || ci->state.state==CS_SPECTATOR) break;
                 QUEUE_MSG;
                 bool canspawn = canspawnitem(type);
-                if(i<MAXENTS && (sents.inrange(i) || canspawnitem(type)))
+                if(i<MAXENTS && (sents.inrange(i) || wantentity(type)));
                 {
-                    server_entity se = { NOTUSED, 0, false };
+                    server_entity se(NOTUSED, 0, false);
                     while(sents.length()<=i) sents.add(se);
-                    sents[i].type = type;
+                    sents[i] = ent;
                     if(canspawn ? !sents[i].spawned : (sents[i].spawned || sents[i].spawntime))
                     {
                         sents[i].spawntime = canspawn ? 1 : 0;

@@ -866,12 +866,6 @@ namespace game
         if(o.z < 0 || o.z > 0xFFFF) flags |= 1<<2;
         if(vel > 0xFF) flags |= 1<<3;
         flags |= ((d->jumping & 1)<<4);
-        // if(fall > 0)
-        // {
-        //     flags |= 1<<4;
-        //     if(fall > 0xFF) flags |= 1<<5;
-        //     if(d->falling.x || d->falling.y || d->falling.z > 0) flags |= 1<<6;
-        // }
         if((lookupmaterial(d->feetpos())&MATF_CLIP) == MAT_GAMECLIP) flags |= 1<<7;
         putuint(q, flags);
         loopk(3)
@@ -891,19 +885,6 @@ namespace game
         uint veldir = (velyaw < 0 ? 360 + int(velyaw)%360 : int(velyaw)%360) + clamp(int(velpitch+90), 0, 180)*360;
         q.put(veldir&0xFF);
         q.put((veldir>>8)&0xFF);
-        // if(fall > 0)
-        // {
-        //     q.put(fall&0xFF);
-        //     if(fall > 0xFF) q.put((fall>>8)&0xFF);
-        //     if(d->falling.x || d->falling.y || d->falling.z > 0)
-        //     {
-        //         float fallyaw, fallpitch;
-        //         vectoyawpitch(d->falling, fallyaw, fallpitch);
-        //         uint falldir = (fallyaw < 0 ? 360 + int(fallyaw)%360 : int(fallyaw)%360) + clamp(int(fallpitch+90), 0, 180)*360;
-        //         q.put(falldir&0xFF);
-        //         q.put((falldir>>8)&0xFF);
-        //     }
-        // }
     }
 
     void sendposition(fpsent *d, bool reliable)
@@ -1058,19 +1039,6 @@ namespace game
                 dir = p.get(); dir |= p.get()<<8;
                 vecfromyawpitch(dir%360, clamp(dir/360, 0, 180)-90, 1, 0, vel);
                 vel.mul(mag/DVELF);
-                // // falling
-                // if(flags&(1<<4))
-                // {
-                //     mag = p.get(); if(flags&(1<<5)) mag |= p.get()<<8;
-                //     if(flags&(1<<6))
-                //     {
-                //         dir = p.get(); dir |= p.get()<<8;
-                //         vecfromyawpitch(dir%360, clamp(dir/360, 0, 180)-90, 1, 0, falling);
-                //     }
-                //     else falling = vec(0, 0, -1);
-                //     falling.mul(mag/DVELF);
-                // }
-                // else falling = vec(0, 0, 0);
                 int seqcolor = (physstate>>3)&1;
                 fpsent *d = getclient(cn);
                 if(!d || d->lifesequence < 0 || seqcolor!=(d->lifesequence&1) || d->state==CS_DEAD) continue;
@@ -1397,9 +1365,8 @@ namespace game
             case N_SPAWNSTATE:
             {
                 int scn = getint(p);
+                int ent = getint(p);
                 fpsent *s = getclient(scn);
-                vec pos;
-                loopk(3) pos[k] = getint(p)/DMF;
                 if(!s) { parsestate(NULL, p); break; }
                 if(s->state==CS_DEAD && s->lastpain) saveragdoll(s);
                 if(s==player1)
@@ -1410,8 +1377,15 @@ namespace game
                 s->respawn();
                 parsestate(s, p);
                 s->state = CS_ALIVE;
-                s->o = pos;
-                entinmap(s);
+                if(ent >= 0 && ent < entities::ents.length())
+                {
+                    extentity *spawn = entities::ents[ent];
+                    s->o = spawn->o;
+                    s->yaw = spawn->attr1;
+                    s->pitch = 0;
+                    entinmap(s);
+                }
+                else findplayerspawn(s);
                 if(s == player1)
                 {
                     showscores(false);
