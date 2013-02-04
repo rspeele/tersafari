@@ -264,6 +264,7 @@ namespace game
     ICOMMAND(arena, "i", (int *a), { player1->arena = *a; });
     void spawnplayer(fpsent *d)   // spawn state
     {
+        findplayerspawn(d, -1);
         spawnstate(d);
         if(d==player1)
         {
