@@ -264,7 +264,7 @@ namespace game
             }
             vec old(bnc.o);
             bool stopped = false;
-            if(bnc.bouncetype==BNC_GRENADE) stopped = bounce(&bnc, 0.75f, 0.5f, 0.8f, bnc.owner) || (bnc.lifetime -= time)<0;
+            if(bnc.bouncetype==BNC_GRENADE) stopped = bounce(&bnc, 0.65f, 0.5f, 0.8f, bnc.owner) || (bnc.lifetime -= time)<0;
             else
             {
                 // cheaper variable rate physics for debris, gibs, etc.

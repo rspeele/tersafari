@@ -529,10 +529,10 @@ struct fpsstate
         {
         case GUN_SG:
         case GUN_RL:
-        case GUN_GL:
             factor = 2.f/3.f;
             break;
         case GUN_RIFLE:
+        case GUN_GL:
             factor = 1.f/3.f;
             break;
         }
