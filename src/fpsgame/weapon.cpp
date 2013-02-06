@@ -349,7 +349,7 @@ namespace game
         p.z += 0.6f*(d->eyeheight + d->aboveeye) - d->eyeheight;
         if(blood) particle_splash(PART_BLOOD, damage/10, 1000, p, 0x60FFFF, 2.96f);
         static const int dmgcolors[] = { 0x00FFFF, 0x7FFF7F, 0xFFFF00, 0xFF7F00, 0xFF3F3F };
-        const int color = dmgcolors[min((uint)damage / 20, sizeof(dmgcolors) / sizeof(int) - 1)];
+        const int color = dmgcolors[min(damage / 20, (int)(sizeof(dmgcolors) / sizeof(int) - 1))];
         if(thirdperson && d != player1)
         {
             defformatstring(ds)("%d", damage);
