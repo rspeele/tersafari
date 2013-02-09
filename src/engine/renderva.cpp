@@ -665,45 +665,6 @@ int calcbbsidemask(const ivec &bbmin, const ivec &bbmax, const vec &lightpos, fl
     return mask;
 }
 
-int calcbbtetramask(const ivec &bbmin, const ivec &bbmax, const vec &lightpos, float lightradius, float bias)
-{
-    // top 1: +1, +1, +1
-    // top 2: -1, -1, +1
-    // bot 1: +1, -1, -1,
-    // bot 2: -1, +1, -1
-
-    vec pmin = bbmin.tovec().sub(lightpos).div(lightradius), pmax = bbmax.tovec().sub(lightpos).div(lightradius);
-    int mask = 0xF;
-
-    bias *= 2;
-
-    // +x,+y top split, no bias
-    if(pmin.x + pmin.y > 0) mask &= ~(1<<1);
-    else if(pmax.x + pmax.y < 0) mask &= ~(1<<0);
-
-    // +x,-y bottom split, no bias
-    if(pmin.x - pmax.y > 0) mask &= ~(1<<3);
-    else if(pmax.x - pmin.y < 0) mask &= ~(1<<2);
-
-    // +x,-y,+z % +x,+y,-z = +y,+z top 1/bottom 1 split
-    if(pmin.y + pmin.z > bias) mask &= ~(1<<2);
-    else if(pmax.y + pmax.z < -bias) mask &= ~(1<<0);
-
-    // +x,+y,-z % -x,+y,+z = +x,+z top 1/bottom 2 split
-    if(pmin.x + pmin.z > bias) mask &= ~(1<<3);
-    else if(pmax.x + pmax.z < -bias) mask &= ~(1<<0);
-
-    // -x,-y,-z % +x,-y,+z = -x,+z top 2/bottom 1 split
-    if(pmin.z - pmax.x > bias) mask &= ~(1<<2);
-    else if(pmax.z - pmin.x < -bias) mask &= ~(1<<1);
-
-    // -x,+y,+z % -x,-y,-z = -y,+z top 2/bottom 2 split
-    if(pmin.z - pmax.y > bias) mask &= ~(1<<3);
-    else if(pmax.z - pmin.y < -bias) mask &= ~(1<<1);
-
-    return mask;
-}
-
 int calcspheresidemask(const vec &p, float radius, float bias)
 {
     // p is in the cubemap's local coordinate system
@@ -719,41 +680,6 @@ int calcspheresidemask(const vec &p, float radius, float bias)
     if(ayzn > bias*ayzp + radius) mask &= dyzn < 0 ? ~((1<<2)|(2<<4)) : ~((2<<2)|(1<<4));
     if(azxp > bias*azxn + radius) mask &= dzxp < 0 ? ~((1<<4)|(1<<0)) : ~((2<<4)|(2<<0));
     if(azxn > bias*azxp + radius) mask &= dzxn < 0 ? ~((1<<4)|(2<<0)) : ~((2<<4)|(1<<0));
-    return mask;
-}
-
-int calcspheretetramask(const vec &p, float radius, float bias)
-{
-    // p is in the cubemap's local coordinate system
-    // bias = border/(size - border)
-    int mask = 0xF;
-
-    bias *= 2;
-    radius *= SQRT2;
-
-    // +x,+y top split, no bias
-    float d = p.x + p.y;
-    if(fabs(d) > radius) mask &= d >= 0 ? ~(1<<1) : ~(1<<0);
-    // +x,-y bottom split, no bias
-    d = p.x - p.y;
-    if(fabs(d) > radius) mask &= d >= 0 ? ~(1<<3) : ~(1<<2);
-
-    // +x,-y,+z % +x,+y,-z = +y,+z top 1/bottom 1 split
-    d = p.y + p.z;
-    if(fabs(d) > radius + bias) mask &= d >= 0 ? ~(1<<2) : ~(1<<0);
-
-    // +x,+y,-z % -x,+y,+z = +x,+z top 1/bottom 2 split
-    d = p.x + p.z;
-    if(fabs(d) > radius + bias) mask &= d >= 0 ? ~(1<<3) : ~(1<<0);
-
-    // -x,-y,-z % +x,-y,+z = -x,+z top 2/bottom 1 split
-    d = p.z - p.x;
-    if(fabs(d) > radius + bias) mask &= d >= 0 ? ~(1<<2) : ~(1<<1);
-
-    // -x,+y,+z % -x,-y,-z = -y,+z top 2/bottom 2 split
-    d = p.z - p.y;
-    if(fabs(d) > radius + bias) mask &= d >= 0 ? ~(1<<3) : ~(1<<1);
-
     return mask;
 }
 
@@ -807,80 +733,6 @@ int calctrisidemask(const vec &p1, const vec &p2, const vec &p3, float bias)
     return mask;
 }
 
-int calctritetramask(const vec &p1, const vec &p2, const vec &p3, float bias)
-{
-    // p1, p2, p3 are in the cubemap's local coordinate system
-    // bias = border/(size - border)
-    int mask = 0xF;
-
-    bias *= 2;
-
-    // +x,+y top split, no bias
-    float d1 = p1.x + p1.y, d2 = p2.x + p2.y, d3 = p3.x + p3.y;
-    if(d1 > 0)
-    {
-        if(d2 > 0 && d3 > 0) mask &= ~(1<<1);
-    }
-    else if(d1 < 0 && d2 < 0 && d3 < 0) mask &= ~(1<<0);
-
-    // +x,-y bottom split, no bias
-    d1 = p1.x - p1.y, d2 = p2.x - p2.y, d3 = p3.x - p3.y;
-    if(d1 > 0)
-    {
-        if(d2 > 0 && d3 > 0) mask &= ~(1<<3);
-    }
-    else if(d1 < 0 && d2 < 0 && d3 < 0) mask &= ~(1<<2);
-
-    // +x,-y,+z % +x,+y,-z = +y,+z top 1/bottom 1 split
-    d1 = p1.y + p1.z, d2 = p2.y + p2.z, d3 = p3.y + p3.z;
-    if(d1 > bias)
-    {
-         if(d2 > bias && d3 > bias) mask &= ~(1<<2);
-    }
-    else if(d1 < -bias && d2 < -bias && d3 < -bias) mask &= ~(1<<0);
-
-    // +x,+y,-z % -x,+y,+z = +x,+z top 1/bottom 2 split
-    d1 = p1.x + p1.z, d2 = p2.x + p2.z, d3 = p3.x + p3.z;
-    if(d1 > bias)
-    {
-        if(d2 > bias && d3 > bias) mask &= ~(1<<3);
-    }
-    else if(d1 < -bias && d2 < -bias && d3 < -bias) mask &= ~(1<<0);
-
-    // -x,-y,-z % +x,-y,+z = -x,+z top 2/bottom 1 split
-    d1 = p1.z - p1.x, d2 = p2.z - p2.x, d3 = p3.z - p3.x;
-    if(d1 > bias)
-    {
-        if(d2 > bias && d3 > bias) mask &= ~(1<<2);
-    }
-    else if(d1 < -bias && d2 < -bias && d3 < -bias) mask &= ~(1<<1);
-
-    // -x,+y,+z % -x,-y,-z = -y,+z top 2/bottom 2 split
-    d1 = p1.z - p1.y, d2 = p2.z - p2.y, d3 = p3.z - p3.y;
-    if(d1 > bias)
-    {
-        if(d2 > bias && d3 > bias) mask &= ~(1<<3);
-    }
-    else if(d1 < -bias && d2 < -bias && d3 < -bias) mask &= ~(1<<1);
-
-    return mask;
-}
-
-static inline int calctrisidemask(const vec &v0, const vec &v1, const vec &v2, const vec &lightorigin, float lightradius, float bias)
-{
-    return calctrisidemask(vec(v0).sub(lightorigin).div(lightradius),
-                           vec(v1).sub(lightorigin).div(lightradius),
-                           vec(v2).sub(lightorigin).div(lightradius),
-                           bias);
-}
-
-static inline int calctritetramask(const vec &v0, const vec &v1, const vec &v2, const vec &lightorigin, float lightradius, float bias)
-{
-    return calctritetramask(vec(v0).sub(lightorigin).div(lightradius),
-                            vec(v1).sub(lightorigin).div(lightradius),
-                            vec(v2).sub(lightorigin).div(lightradius),
-                            bias);
-}
 
 int cullfrustumsides(const vec &lightpos, float lightradius, float size, float border)
 {
@@ -940,39 +792,6 @@ int cullfrustumsides(const vec &lightpos, float lightradius, float size, float b
     return sides & masks[0] & masks[1] & masks[2] & masks[3] & masks[4] & masks[5];
 }
 
-int cullfrustumtetra(const vec &lightpos, float lightradius, float size, float border)
-{
-    int outside[5] = { 0, 0, 0, 0 };
-    loopi(4) if(vfcP[i].dist(lightpos) < 0) outside[4] |= 1<<i;
-    float dist = vfcP[4].dist(lightpos);
-    if(dist < 0) outside[4] |= 1<<4; 
-    if(dist > vfcDfog) outside[4] |= 1<<5;
-    if(!outside[4]) return 0xF;
-
-    float pr = SQRT3*lightradius;
-    vec p[4] =
-    {
-        vec(lightpos).add(vec(-pr, pr, pr)),
-        vec(lightpos).add(vec(pr, -pr, pr)),
-        vec(lightpos).add(vec(pr, pr, -pr)),
-        vec(lightpos).add(vec(-pr, -pr, -pr))
-    }; 
-    loopk(4)
-    {
-        loopi(4) if(vfcP[i].dist(p[k]) < 0) outside[k] |= 1<<i;
-        float dist = vfcP[k].dist(p[k]);
-        if(dist < 0) outside[k] |= 1<<4; 
-        if(dist > vfcDfog) outside[k] |= 1<<5;
-    }
-
-    int mask = 0xF;
-    if(outside[4] & outside[0] & outside[1] & outside[2]) mask &= ~(1<<0);
-    if(outside[4] & outside[0] & outside[1] & outside[3]) mask &= ~(1<<1);
-    if(outside[4] & outside[1] & outside[2] & outside[3]) mask &= ~(1<<2);
-    if(outside[4] & outside[0] & outside[2] & outside[3]) mask &= ~(1<<3);
-    return mask;
-}
-
 VAR(smbbcull, 0, 1, 1);
 VAR(smdistcull, 0, 1, 1);
 VAR(smnodraw, 0, 0, 1);
@@ -1010,23 +829,6 @@ void sortshadowvas()
         *last = va;
         while(va->rnext) va = va->rnext;
         last = &va->rnext;
-    }
-}
-
-void findtetrashadowvas(vector<vtxarray *> &vas)
-{
-    loopv(vas)
-    {
-        vtxarray &v = *vas[i];
-        float dist = vadist(&v, shadoworigin);
-        if(dist < shadowradius || !smdistcull)
-        {
-            v.shadowmask = !smbbcull ? 0x3F : (v.children.length() || v.mapmodels.length() ? 
-                                calcbbtetramask(v.bbmin, v.bbmax, shadoworigin, shadowradius, shadowbias) :
-                                calcbbtetramask(v.geommin, v.geommax, shadoworigin, shadowradius, shadowbias));
-            addshadowva(&v, dist);
-            if(v.children.length()) findtetrashadowvas(v.children);
-        }
     }
 }
 
@@ -1107,7 +909,6 @@ void findshadowvas()
     {
         case SM_REFLECT: findrsmshadowvas(varoot); break;
         case SM_CUBEMAP: findshadowvas(varoot); break;
-        case SM_TETRA: findtetrashadowvas(varoot); break;
         case SM_CASCADE: findcsmshadowvas(varoot); break;
         case SM_SPOT: findspotshadowvas(varoot); break;
     }
@@ -1116,8 +917,7 @@ void findshadowvas()
 
 void rendershadowmapworld()
 {
-    if(shadowmapping == SM_TETRA) SETSHADER(tetraworld);
-    else SETSHADER(shadowmapworld);
+    SETSHADER(shadowmapworld);
 
     glEnableClientState(GL_VERTEX_ARRAY);
 
@@ -1184,7 +984,6 @@ void findshadowmms()
                     if(!calcbbcsmsplits(oe->bbmin, oe->bbmax))
                         continue;
                     break;
-                case SM_TETRA:
                 case SM_CUBEMAP: 
                     if(smdistcull && shadoworigin.dist_to_bb(oe->bbmin, oe->bbmax) >= shadowradius)
                         continue;
@@ -1249,9 +1048,9 @@ struct renderstate
     Slot *slot, *texgenslot;
     VSlot *vslot, *texgenvslot;
     float texgenscrollS, texgenscrollT;
-    int texgendim;
+    int texgendim, texgenmillis;
 
-    renderstate() : colormask(true), depthmask(true), alphaing(0), vbuf(0), diffusetmu(0), colorscale(1, 1, 1), alphascale(0), refractscale(0), refractcolor(1, 1, 1), blendx(-1), blendy(-1), slot(NULL), texgenslot(NULL), vslot(NULL), texgenvslot(NULL), texgenscrollS(0), texgenscrollT(0), texgendim(-1)
+    renderstate() : colormask(true), depthmask(true), alphaing(0), vbuf(0), diffusetmu(0), colorscale(1, 1, 1), alphascale(0), refractscale(0), refractcolor(1, 1, 1), blendx(-1), blendy(-1), slot(NULL), texgenslot(NULL), vslot(NULL), texgenvslot(NULL), texgenscrollS(0), texgenscrollT(0), texgendim(-1), texgenmillis(lastmillis)
     {
         loopk(4) color[k] = 1;
         loopk(8) textures[k] = 0;
@@ -1419,7 +1218,7 @@ static void changevbuf(renderstate &cur, int pass, vtxarray *va)
 
     if(pass==RENDERPASS_GBUFFER || pass==RENDERPASS_RSM)
     {
-        glTexCoordPointer(2, GL_FLOAT, sizeof(vertex), &vdata->u);
+        glTexCoordPointer(2, GL_FLOAT, sizeof(vertex), vdata->tc.v);
         glNormalPointer(GL_BYTE, sizeof(vertex), vdata->norm.v);
         glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(vertex), vdata->tangent.v);
     }
@@ -1527,8 +1326,8 @@ static void changetexgen(renderstate &cur, int dim, Slot &slot, VSlot &vslot)
                   ys = (vslot.rotation>=1 && vslot.rotation<=2) || vslot.rotation==5 ? -tex->ys : tex->ys,
                   scrollS = vslot.scrollS, scrollT = vslot.scrollT;
             if((vslot.rotation&5)==1) swap(scrollS, scrollT);
-            scrollS *= lastmillis*tex->xs/xs;
-            scrollT *= lastmillis*tex->ys/ys;
+            scrollS *= cur.texgenmillis*tex->xs/xs;
+            scrollT *= cur.texgenmillis*tex->ys/ys;
             if(cur.texgenscrollS != scrollS || cur.texgenscrollT != scrollT)
             {
                 cur.texgenscrollS = scrollS;
@@ -1734,8 +1533,7 @@ extern void renderradiancehints();
 
 void rendergeom()
 {
-    bool mainpass = !envmapping,
-         doOQ = hasOQ && oqfrags && oqgeom && mainpass,
+    bool doOQ = hasOQ && oqfrags && oqgeom && !drawtex,
          doZP = doOQ && zpass;
     renderstate cur;
     if(!doZP) 
@@ -1869,7 +1667,7 @@ void rendergeom()
     glBindBuffer_(GL_ELEMENT_ARRAY_BUFFER_ARB, 0);
     glDisableClientState(GL_VERTEX_ARRAY);
 
-    if(!doZP && !minimapping)
+    if(!doZP && drawtex != DRAWTEX_MINIMAP)
     {
         glFlush();
         if(cur.colormask) { cur.colormask = false; glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE); }
@@ -1877,7 +1675,7 @@ void rendergeom()
         collectlights();
         if(!cur.colormask) { cur.colormask = true; glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE); }
         if(!cur.depthmask) { cur.depthmask = true; glDepthMask(GL_TRUE); }
-        if(mainpass && rhinoq) renderradiancehints();
+        if(!drawtex && rhinoq) renderradiancehints();
         glFlush();
     }
 }
@@ -1897,9 +1695,10 @@ int dynamicshadowvabounds(int mask, vec &bbmin, vec &bbmax)
     return vis;
 }
  
-void renderrsmgeom()
+void renderrsmgeom(bool dyntex)
 {
     renderstate cur;
+    if(!dyntex) cur.texgenmillis = 0;
 
     glEnableClientState(GL_VERTEX_ARRAY);
 
@@ -2077,36 +1876,6 @@ void renderalphageom(int side)
     glDisableClientState(GL_VERTEX_ARRAY);
 }
 
-void renderinferdepth()
-{
-    glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-    nocolorshader->set();
-
-    glEnableClientState(GL_VERTEX_ARRAY);
-
-    vtxarray *prev = NULL;
-    for(vtxarray *va = visibleva; va; va = va->next)
-    {
-        if(!va->texs || va->occluded >= OCCLUDE_GEOM) continue;
-
-        if(!prev || va->vbuf != prev->vbuf)
-        {
-            glBindBuffer_(GL_ARRAY_BUFFER_ARB, va->vbuf);
-            glBindBuffer_(GL_ELEMENT_ARRAY_BUFFER_ARB, va->ebuf);
-            glVertexPointer(3, GL_FLOAT, sizeof(vertex), ((vertex *)0)->pos.v);
-        }
-
-        xtravertsva += va->verts;
-        drawvatris(va, 3*va->tris, 0);
-    }
-
-    glBindBuffer_(GL_ARRAY_BUFFER_ARB, 0);
-    glBindBuffer_(GL_ELEMENT_ARRAY_BUFFER_ARB, 0);
-    glDisableClientState(GL_VERTEX_ARRAY);
-
-    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-}
-
 HVARP(explicitskycolour, 0, 0x800080, 0xFFFFFF);
 
 bool renderexplicitsky(bool outline)
@@ -2164,7 +1933,7 @@ struct shadowmesh
 {
     vec origin;
     float radius;
-    vec spotdir;
+    vec spotloc;
     int spotangle;
     int type;
     int draws[6];
@@ -2218,9 +1987,9 @@ struct shadowdrawinfo
     void reset() { minvert = USHRT_MAX; maxvert = 0; }
 };
 
-static void flushshadowmeshdraws(shadowmesh &m, shadowdrawinfo draws[6])
+static void flushshadowmeshdraws(shadowmesh &m, int sides, shadowdrawinfo draws[6])
 {
-    int sides = m.type == SM_SPOT ? 1 : (m.type == SM_TETRA ? 4 : 6), numindexes = 0;
+    int numindexes = 0;
     loopi(sides) numindexes += shadowtris[i].length();
     if(!numindexes) return;
 
@@ -2265,23 +2034,26 @@ static void flushshadowmeshdraws(shadowmesh &m, shadowdrawinfo draws[6])
     shadowvbos.add(vbuf);
 }
 
-static void genshadowmeshtris(shadowmesh &m, shadowdrawinfo draws[6], ushort *edata, int numtris, vertex *vdata)
+static void genshadowmeshtris(shadowmesh &m, int sides, shadowdrawinfo draws[6], ushort *edata, int numtris, vertex *vdata)
 {
-    int sides = m.type == SM_SPOT ? 1 : (m.type == SM_TETRA ? 4 : 6);
+    extern int smcullside;
     loopj(numtris)
     {
         const vec &v0 = vdata[edata[3*j]].pos, &v1 = vdata[edata[3*j+1]].pos, &v2 = vdata[edata[3*j+2]].pos;
-        vec bbmin = vec(v0).min(v1).min(v2), bbmax = vec(v0).max(v1).max(v2);
-        if(shadoworigin.dist_to_bb(bbmin, bbmax) >= shadowradius) continue;
+        vec l0 = vec(v0).sub(shadoworigin);
+        float side = l0.scalartriple(vec(v1).sub(v0), vec(v2).sub(v0)); 
+        if(smcullside ? side > 0 : side < 0) continue;
+        vec l1 = vec(v1).sub(shadoworigin), l2 = vec(v2).sub(shadoworigin);
+        if(l0.squaredlen() > shadowradius*shadowradius && l1.squaredlen() > shadowradius*shadowradius && l2.squaredlen() > shadowradius*shadowradius)
+            continue;
         int sidemask = 0;
         switch(m.type)
         {
-            case SM_SPOT: sidemask = bbinsidespot(shadoworigin, shadowdir, shadowspot, bbmin, bbmax) ? 1 : 0; break;
-            case SM_TETRA: sidemask = calctritetramask(v0, v1, v2, shadoworigin, shadowradius, shadowbias); break;
-            case SM_CUBEMAP: sidemask = calctrisidemask(v0, v1, v2, shadoworigin, shadowradius, shadowbias); break;
+            case SM_SPOT: sidemask = bbinsidespot(shadoworigin, shadowdir, shadowspot, vec(v0).min(v1).min(v2), vec(v0).max(v1).max(v2).add(1)) ? 1 : 0; break;
+            case SM_CUBEMAP: sidemask = calctrisidemask(l0.div(shadowradius), l1.div(shadowradius), l2.div(shadowradius), shadowbias); break;
         }
         if(!sidemask) continue;
-        if(shadowverts.verts.length() + 3 >= USHRT_MAX) flushshadowmeshdraws(m, draws);
+        if(shadowverts.verts.length() + 3 >= USHRT_MAX) flushshadowmeshdraws(m, sides, draws);
         int i0 = shadowverts.add(v0), i1 = shadowverts.add(v1), i2 = shadowverts.add(v2);
         ushort minvert = min(i0, min(i1, i2)), maxvert = max(i0, max(i1, i2));
         loopk(sides) if(sidemask&(1<<k))
@@ -2299,45 +2071,27 @@ static void genshadowmeshtris(shadowmesh &m, shadowdrawinfo draws[6], ushort *ed
 static void genshadowmesh(int idx, extentity &e)
 {
     shadowmesh m;
-    m.origin = e.o;
-    m.radius = e.attr1 > 0 ? e.attr1 : 2*worldsize;
-    if(e.attached && e.attached->type == ET_SPOTLIGHT)
-    {
-        m.type = SM_SPOT;
-        m.spotdir = e.attached->o;
-        m.spotangle = clamp(int(e.attached->attr1), 1, 89);
-    }
-    else
-    {
-        m.type = smtetra && glslversion >= 130 ? SM_TETRA : SM_CUBEMAP;
-        m.spotdir = e.o;
-        m.spotangle = 0;
-    }
+    m.type = calcshadowinfo(e, m.origin, m.radius, m.spotloc, m.spotangle, shadowbias);
+    if(!m.type) return;
     memset(m.draws, -1, sizeof(m.draws));
-
-    extern float smspotprec, smtetraprec, smcubeprec;
-    extern int smfilter, smborder, smborder2, smminsize;
-
-    float lod = m.type == SM_SPOT ? smspotprec : (m.type == SM_TETRA ? smtetraprec : smcubeprec);
-    int size = clamp(int(ceil(lod * smminsize)), 1, 1024), border = smfilter > 2 ? smborder2 : smborder;
 
     shadowmapping = m.type;
     shadoworigin = m.origin;
     shadowradius = m.radius;
-    shadowbias = border / float(size - border); 
-    shadowdir = m.type == SM_SPOT ? vec(m.spotdir).sub(m.origin).normalize() : vec(0, 0, 0);
+    shadowdir = m.type == SM_SPOT ? vec(m.spotloc).sub(m.origin).normalize() : vec(0, 0, 0);
     shadowspot = m.spotangle;
 
     findshadowvas();
 
+    int sides = m.type == SM_SPOT ? 1 : 6;
     shadowdrawinfo draws[6];
     for(vtxarray *va = shadowva; va; va = va->rnext)
     {
         if(!va->shadowmask) continue;
-        if(va->tris) genshadowmeshtris(m, draws, va->edata + va->eoffset, va->tris, va->vdata);
-        if(skyshadow && va->sky) genshadowmeshtris(m, draws, va->skydata + va->skyoffset, va->sky/3, va->vdata); 
+        if(va->tris) genshadowmeshtris(m, sides, draws, va->edata + va->eoffset, va->tris, va->vdata);
+        if(skyshadow && va->sky) genshadowmeshtris(m, sides, draws, va->skydata + va->skyoffset, va->sky/3, va->vdata); 
     }
-    flushshadowmeshdraws(m, draws);
+    flushshadowmeshdraws(m, sides, draws);
     
     shadowmeshes[idx] = m;
 
@@ -2373,11 +2127,11 @@ void genshadowmeshes()
 shadowmesh *findshadowmesh(int idx, extentity &e)
 {
     shadowmesh *m = shadowmeshes.access(idx);
-    if(!m || m->type != shadowmapping || m->origin != shadoworigin || m->radius != shadowradius) return NULL;
+    if(!m || m->type != shadowmapping || m->origin != shadoworigin || m->radius < shadowradius) return NULL;
     switch(m->type)
     {
         case SM_SPOT: 
-            if(!e.attached || e.attached->type != ET_SPOTLIGHT || m->spotdir != e.attached->o || m->spotangle != clamp(int(e.attached->attr1), 1, 89))
+            if(!e.attached || e.attached->type != ET_SPOTLIGHT || m->spotloc != e.attached->o || m->spotangle < clamp(int(e.attached->attr1), 1, 89))
                 return NULL;
             break;
     } 
@@ -2389,8 +2143,7 @@ void rendershadowmesh(shadowmesh *m)
     int draw = m->draws[shadowside];
     if(draw < 0) return;
 
-    if(shadowmapping == SM_TETRA) SETSHADER(tetraworld);
-    else SETSHADER(shadowmapworld);
+    SETSHADER(shadowmapworld);
 
     glEnableClientState(GL_VERTEX_ARRAY);
 

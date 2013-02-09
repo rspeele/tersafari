@@ -292,6 +292,8 @@ extern bool hasVBO, hasDRE, hasOQ, hasTR, hasT3D, hasFBO, hasAFBO, hasDS, hasTF,
 extern int hasstencil;
 extern int glversion, glslversion;
 
+enum { DRAWTEX_NONE = 0, DRAWTEX_ENVMAP, DRAWTEX_MINIMAP, DRAWTEX_MODELPREVIEW };
+
 extern int vieww, viewh;
 extern int fov;
 extern float curfov, fovy, aspect, forceaspect;
@@ -300,8 +302,7 @@ extern int farplane;
 extern int hdr;
 extern bool hdrfloat;
 extern float ldrscale, ldrscaleb;
-extern bool envmapping, modelpreviewing;
-extern int minimapping;
+extern int drawtex;
 extern const glmatrixf viewmatrix;
 extern glmatrixf mvmatrix, projmatrix, mvpmatrix, invmvmatrix, invmvpmatrix, invprojmatrix;
 extern int fog;
@@ -440,12 +441,11 @@ static inline void masktiles(uint *tiles, float sx1, float sy1, float sx2, float
     for(int ty = ty1; ty < ty2; ty++) tiles[ty] |= ((1<<(tx2-tx1))-1)<<tx1;
 }
 
-enum { SM_NONE = 0, SM_REFLECT, SM_CUBEMAP, SM_TETRA, SM_CASCADE, SM_SPOT };
+enum { SM_NONE = 0, SM_REFLECT, SM_CUBEMAP, SM_CASCADE, SM_SPOT };
+
+enum { L_NOSHADOW = 1<<0, L_NODYNSHADOW = 1<<1 };
  
 extern int shadowmapping;
-
-extern int smtetra, smtetraclip;
-extern plane smtetraclipplane;
 
 extern vec shadoworigin, shadowdir;
 extern float shadowradius, shadowbias;
@@ -460,22 +460,19 @@ extern void clearshadowcache();
 extern void findshadowvas();
 extern void findshadowmms();
 
+extern int calcshadowinfo(const extentity &e, vec &origin, float &radius, vec &spotloc, int &spotangle, float &bias);
 extern int dynamicshadowvabounds(int mask, vec &bbmin, vec &bbmax);
 extern void rendershadowmapworld();
 extern void batchshadowmapmodels();
 extern void rendershadowatlas();
-extern void renderrsmgeom();
+extern void renderrsmgeom(bool dyntex = false);
 extern void renderradiancehints();
 extern void clearradiancehintscache();
 
-extern int calcbbtetramask(const vec &bbmin, const vec &bbmax, const vec &lightpos, float lightradius, float bias);
 extern int calcbbsidemask(const vec &bbmin, const vec &bbmax, const vec &lightpos, float lightradius, float bias);
 extern int calcspheresidemask(const vec &p, float radius, float bias);
-extern int calcspheretetramask(const vec &p, float radius, float bias);
 extern int calctrisidemask(const vec &p1, const vec &p2, const vec &p3, float bias);
-extern int calctritetramask(const vec &p1, const vec &p2, const vec &p3, float bias);
 extern int cullfrustumsides(const vec &lightpos, float lightradius, float size, float border);
-extern int cullfrustumtetra(const vec &lightpos, float lightradius, float size, float border);
 extern int calcbbcsmsplits(const ivec &bbmin, const ivec &bbmax);
 extern int calcspherecsmsplits(const vec &center, float radius);
 extern int calcbbrsmsplits(const ivec &bbmin, const ivec &bbmax);
@@ -503,10 +500,10 @@ enum { AA_UNUSED = 0, AA_LUMA, AA_VELOCITY };
 extern void cleanupgbuffer();
 extern void initgbuffer();
 extern void maskgbuffer(const char *mask);
-extern void preparegbuffer();
-extern void rendergbuffer();
+extern void preparegbuffer(bool depthclear = true);
+extern void rendergbuffer(bool depthclear = true);
 extern void shadegbuffer();
-extern void shademinimap(const vec &color = vec(0, 0, 0));
+extern void shademinimap(const vec &color = vec(-1, -1, -1));
 extern void shademodelpreview(int x, int y, int w, int h, bool background = true, bool scissor = false);
 extern void rendertransparent();
 extern void renderao();
@@ -812,9 +809,8 @@ extern mapmodelinfo *getmminfo(int i);
 extern void resetmodelbatches();
 extern void startmodelquery(occludequery *query);
 extern void endmodelquery();
-extern void rendermodelbatches();
+extern void rendermodelbatches(bool dynmodel = true);
 extern void shadowmaskbatchedmodels(bool dynshadow = true);
-extern void rendermodelbatches();
 extern void rendermapmodel(int idx, int anim, const vec &o, float yaw = 0, float pitch = 0, int flags = MDL_CULL_VFC | MDL_CULL_DIST, int basetime = 0, float size = 1);
 extern void clearbatchedmapmodels();
 extern void preloadusedmapmodels(bool msg = false, bool bih = false);
@@ -827,13 +823,13 @@ extern void clearparticles();
 extern void clearparticleemitters();
 extern void seedparticles();
 extern void updateparticles();
-extern void renderparticles(bool mainpass = false);
+extern void renderparticles();
 extern bool printparticles(extentity &e, char *buf);
 
 // decal
 extern void initdecals();
 extern void cleardecals();
-extern void renderdecals(bool mainpass = false);
+extern void renderdecals();
 
 // rendersky
 extern int skytexture, skyshadow, explicitsky;

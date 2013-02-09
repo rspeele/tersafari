@@ -583,13 +583,6 @@ static inline int shadowmaskmodel(const vec &center, float radius)
     {
         case SM_REFLECT:
             return calcspherersmsplits(center, radius);
-        case SM_TETRA:
-        {
-            vec scenter = vec(center).sub(shadoworigin);
-            float sradius = radius + shadowradius;
-            if(scenter.squaredlen() >= sradius*sradius) return 0;
-            return calcspheretetramask(scenter, radius, shadowbias*shadowradius);
-        }
         case SM_CUBEMAP:
         {
             vec scenter = vec(center).sub(shadoworigin);
@@ -675,13 +668,13 @@ int batcheddynamicmodelbounds(int mask, vec &bbmin, vec &bbmax)
     return vis;
 }
 
-void rendermodelbatches()
+void rendermodelbatches(bool dynmodel)
 {
     float aamask = -1;
     loopv(batches)
     {
         modelbatch &b = batches[i];
-        if(b.batched < 0) continue;
+        if(b.batched < 0 || (!dynmodel && (!(b.flags&MDL_MAPMODEL) || b.m->animated()))) continue;
         bool rendered = false;
         occludequery *query = NULL;
         if(shadowmapping) for(int j = b.batched; j >= 0;)
@@ -1073,7 +1066,7 @@ void renderclient(dynent *d, const char *mdlname, modelattach *attachments, int 
     if(d->type==ENT_PLAYER) flags |= MDL_FULLBRIGHT;
     else flags |= MDL_CULL_DIST;
     if(d->state==CS_LAGGED) fade = min(fade, 0.3f);
-    if(modelpreviewing) flags &= ~(MDL_FULLBRIGHT | MDL_CULL_VFC | MDL_CULL_OCCLUDED | MDL_CULL_QUERY | MDL_CULL_DIST);
+    if(drawtex == DRAWTEX_MODELPREVIEW) flags &= ~(MDL_FULLBRIGHT | MDL_CULL_VFC | MDL_CULL_OCCLUDED | MDL_CULL_QUERY | MDL_CULL_DIST);
     rendermodel(mdlname, anim, o, yaw, pitch, flags, d, attachments, basetime, 0, fade);
 }
 
