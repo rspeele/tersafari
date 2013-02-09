@@ -135,7 +135,8 @@ struct elimclientmode : clientmode
     }
     bool canspawn(clientinfo *ci, bool connecting)
     {
-        return numclients(-1, true, false) <= 1;
+        const int numplayers = numclients(-1, true, false);
+        return numplayers <= 1 || (numplayers <= 2 && connecting);
     }
     bool canchangeteam(clientinfo *ci, const char *oldteam, const char *newteam)
     {
