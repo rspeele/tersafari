@@ -1006,7 +1006,7 @@ namespace game
         glScalef(h/1800.0f, h/1800.0f, 1);
 
         int pw, ph, tw, th, fw, fh;
-        if(player1->state==CS_SPECTATOR)
+        if(spectating(player1))
         {
             text_bounds("  ", pw, ph);
             text_bounds("SPECTATOR", tw, th);
