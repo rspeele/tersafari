@@ -39,10 +39,8 @@ namespace game
     {
         return spec && player &&
             player->state != CS_SPECTATOR &&
-            (spec->state == CS_SPECTATOR ||
-             (spec->state == CS_DEAD &&
-              player->state != CS_DEAD &&
-              isteam(spec->team, player->team)));
+            ((!cmode && spec->state == CS_SPECTATOR) ||
+             (cmode && cmode->canfollow(spec, player)));
     }
 
 	void follow(char *arg)

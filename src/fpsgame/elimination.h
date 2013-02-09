@@ -156,6 +156,17 @@ struct elimclientmode : clientmode
         }
     }
 #else
+    bool canfollow(const fpsent *spec, const fpsent *player)
+    {
+        if(spec->state != CS_SPECTATOR && (spec->state != CS_DEAD || player->state == CS_DEAD)) return false;
+        if(isteam(spec->team, player->team)) return true;
+        loopv(players)
+        { // if any living players are on your team, you can't spec an opponent
+            fpsent *o = players[i];
+            if(o->state == CS_ALIVE && isteam(o->team, spec->team)) return false;
+        }
+        return true;
+    }
 #endif
 
 };
