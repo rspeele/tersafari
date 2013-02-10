@@ -432,6 +432,52 @@ namespace game
         return dist;
     }
 
+    bool intersect(dynent *d, const vec &from, const vec &to, float &dist)   // if lineseg hits entity bounding box
+    {
+        vec bottom(d->o), top(d->o);
+        bottom.z -= d->eyeheight;
+        top.z += d->aboveeye;
+        return linecylinderintersect(from, to, bottom, top, d->radius, dist);
+    }
+
+    VAR(debugexplosions, 0, 0, 1);
+    bool radialobstructed(dynent *d, const vec &from)
+    {
+        const int hres = 4;
+        const int vres = 4;
+        static vec ends[vres*hres];
+        // ray from v to d
+        vec ray(d->o);
+        ray.sub(from);
+        // 2d vector perpendicular to ray
+        vec pr(ray);
+        pr.z = 0;
+        swap(pr.x, pr.y);
+        pr.x = -pr.x;
+        pr.rescale(d->radius);
+        // populate ends
+        const float vstep = (d->aboveeye + d->eyeheight)/vres;
+        vec vertical(d->o);
+        vertical.add(d->aboveeye);
+        vertical.sub(pr);
+        vec hstep(pr);
+        hstep.div(hres / 2);
+        loopi(vres) {
+            loopj(hres) {
+                vec &to = ends[i*vres+j];
+                to = vec(vertical).add(vec(hstep).mul(j));
+                if(debugexplosions) particle_flare(from, to, 5000, PART_STREAK, 0xFFFF00, 0.15f);
+                vec unitv;
+                float dist = to.dist(from, unitv);
+                unitv.div(dist);
+                float barrier = raycube(from, unitv, dist, RAY_CLIPMAT|RAY_ALPHAPOLY);
+                if(barrier >= dist) return false;
+            }
+            vertical.z -= vstep;
+        }
+        return true;
+    }
+
     void radialeffect(dynent *o, const vec &v, int qdam, fpsent *at, int gun)
     {
         if(o->state!=CS_ALIVE) return;
@@ -439,6 +485,7 @@ namespace game
         float dist = projdist(o, dir, v);
         if(dist<guns[gun].exprad)
         {
+            if(radialobstructed(o, v)) return;
             int damage = (int)(qdam*(1-dist/EXP_DISTSCALE/guns[gun].exprad));
             if(o==at) damage /= EXP_SELFDAMDIV;
             hit(damage, o, at, dir, gun, dist);
@@ -452,7 +499,7 @@ namespace game
         particle_fireball(v, guns[gun].exprad, gun!=GUN_GL ? PART_EXPLOSION : PART_EXPLOSION_BLUE, gun!=GUN_GL ? -1 : int((guns[gun].exprad-4.0f)*15), gun!=GUN_GL ? 0xFF8080 : 0x80FFFF, 4.0f);
         int numdebris = gun==GUN_BARREL ? rnd(max(maxbarreldebris-5, 1))+5 : rnd(maxdebris-5)+5;
         vec debrisvel = owner->o==v ? vec(0, 0, 0) : vec(owner->o).sub(v).normalize(), debrisorigin(v);
-        if(gun==GUN_RL) 
+        if(gun==GUN_RL)
         {
             debrisorigin.add(vec(debrisvel).mul(8));
             adddynlight(safe ? v : debrisorigin, 1.15f*guns[gun].exprad, vec(4, 3.0f, 2.0), 700, 100, 0, guns[gun].exprad/2, vec(2.0, 1.5f, 1.0f));
@@ -562,7 +609,10 @@ namespace game
                     {
                         if(raycubepos(p.o, p.dir, p.to, 0, RAY_CLIPMAT|RAY_ALPHAPOLY)>=4) continue;
                     }
-                    projsplash(p, v, NULL, qdam);
+                    // back up explosion point slightly
+                    vec back(p.dir);
+                    back.mul(-1.5f); // just enough to avoid stairs blocking explosions
+                    projsplash(p, v.add(back), NULL, qdam);
                     exploded = true;
                 }
                 else
@@ -705,14 +755,6 @@ namespace game
         bottom.z -= d->beloweye;
         top.z += d->aboveeye;
         return linecylinderintersect(from, to, bottom, top, d->headradius, dist);
-    }
-
-    bool intersect(dynent *d, const vec &from, const vec &to, float &dist)   // if lineseg hits entity bounding box
-    {
-        vec bottom(d->o), top(d->o);
-        bottom.z -= d->eyeheight;
-        top.z += d->aboveeye;
-        return linecylinderintersect(from, to, bottom, top, d->radius, dist);
     }
 
     dynent *intersectclosest(const vec &from, const vec &to, fpsent *at, float &bestdist)
