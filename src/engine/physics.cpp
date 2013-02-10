@@ -1512,7 +1512,7 @@ bool move(physent *d, vec &dir)
     return !collided;
 }
 
-bool bounce(physent *d, float secs, float elasticity, float waterfric, float grav, physent *safe)
+bool bounce(physent *d, float secs, float elasticity, float waterfric, float grav, physent *safe, bool players)
 {
     // make sure bouncers don't start inside geometry
     if(d->physstate!=PHYS_BOUNCE && !collide(d, vec(0, 0, 0), 0, false))
@@ -1546,7 +1546,7 @@ bool bounce(physent *d, float secs, float elasticity, float waterfric, float gra
         vec dir(d->vel);
         dir.mul(secs);
         d->o.add(dir);
-        if(collide(d, dir, 0.0f, true, safe))
+        if(collide(d, dir, 0.0f, players, safe))
         {
             if(inside)
             {
@@ -1957,7 +1957,7 @@ void moveplayer(physent *pl, int moveres, bool local)
     }
 }
 
-bool bounce(physent *d, float elasticity, float waterfric, float grav, physent *safe)
+bool bounce(physent *d, float elasticity, float waterfric, float grav, physent *safe, bool players)
 {
     if(physsteps <= 0)
     {
@@ -1969,10 +1969,10 @@ bool bounce(physent *d, float elasticity, float waterfric, float grav, physent *
     bool hitplayer = false;
     loopi(physsteps-1)
     {
-        if(bounce(d, physframetime/1000.0f, elasticity, waterfric, grav, safe)) hitplayer = true;
+        if(bounce(d, physframetime/1000.0f, elasticity, waterfric, grav, safe, players)) hitplayer = true;
     }
     d->deltapos = d->o;
-    if(bounce(d, physframetime/1000.0f, elasticity, waterfric, grav, safe)) hitplayer = true;
+    if(bounce(d, physframetime/1000.0f, elasticity, waterfric, grav, safe, players)) hitplayer = true;
     d->newpos = d->o;
     d->deltapos.sub(d->newpos);
     interppos(d);
