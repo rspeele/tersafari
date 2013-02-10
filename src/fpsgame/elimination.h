@@ -78,7 +78,7 @@ struct elimclientmode : clientmode
         {
             if(clients[i]->state.state!=CS_SPECTATOR)
             {
-                clients[i]->state.respawn();
+                clients[i]->state.reassign();
                 sendspawn(clients[i]);
             }
         }
