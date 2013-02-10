@@ -336,8 +336,9 @@ namespace game
     SVARFP(customhud, "", hudstate::load(customhud));
     namespace hudstate
     {
-        uint lastscrw, lastscrh;
+        uint lastscrw = -1, lastscrh = -1;
         uint scrw = 0, scrh = 0;
+        float aspect;
         uint r = 0xff, g = 0xff, b = 0xff, a = 0xff;
         int x = 0, y = 0, w = 50, h = 0;
         char xa = 'l', ya = 't';
@@ -346,8 +347,8 @@ namespace game
 
         void setxy(int tx, int ty)
         {
-            x = tx >= 0 ? tx : scrw - tx + 1;
-            y = ty >= 0 ? ty : scrh - ty + 1;
+            x = tx;
+            y = ty;
         }
         void setcolor(int rgb, int ta)
         {
@@ -357,8 +358,9 @@ namespace game
             a = ta ? ta : 0xff;
             glColor4ub(r, g, b, a);
         }
-        void setalpha(int a)
+        void setalpha(int set)
         {
+            a = set;
             glColor4ub(r, g, b, a);
         }
         void align(int &tx, int &ty, int tw, int th)
@@ -432,9 +434,16 @@ namespace game
         }
         void draw()
         {
-            if (scrw != lastscrw || scrh != lastscrh) load(customhud);
+            if (!(scrw && scrh)) return;
+            if (scrw != lastscrw || scrh != lastscrh)
+            {
+                aspect = (float)scrw / (float)scrh;
+                load(customhud);
+            }
             if(!code) return;
             glPushMatrix();
+            glTranslatef(scrw * 0.5f, scrh * 0.5f, 0);
+            glScalef(scrh * 5e-4f, scrh * 5e-4f, 1);
             execute(code);
             glPopMatrix();
             setfont("default");
@@ -444,35 +453,36 @@ namespace game
     }
 
     // rendering HUD elements and adjusting state
-    ICOMMAND(hud_color, "ii", (int *rgb, int *a), hudstate::setcolor(*rgb, *a));
-    ICOMMAND(hud_alpha, "i", (int *a), hudstate::setalpha(*a));
-    ICOMMAND(hud_pos, "ii", (int *x, int *y), hudstate::setxy(*x, *y));
-    ICOMMAND(hud_size, "ii", (int *w, int *h), {hudstate::w = *w; hudstate::h = *h;});
-    ICOMMAND(hud_textscale, "f", (float *s), {hudstate::scale = *s;});
-    ICOMMAND(hud_textheight, "i", (int *h), hudstate::textheight(*h));
-    ICOMMAND(hud_align, "ss", (char *ya, char *xa), {hudstate::xa = *xa | 32; hudstate::ya = *ya | 32;});
-    ICOMMAND(hud_font, "s", (char *font), setfont(font));
-    ICOMMAND(hud_image, "s", (char *img), hudstate::image(img));
-    ICOMMAND(hud_rectangle, "", (), hudstate::rectangle());
-    ICOMMAND(hud_text, "s", (char *str), hudstate::text(str));
-    ICOMMAND(hud_xpct, "i", (int *pct), intret(hudstate::scrw * (float)(*pct / 100.0f)));
-    ICOMMAND(hud_ypct, "i", (int *pct), intret(hudstate::scrh * (float)(*pct / 100.0f)));
+    ICOMMAND(hudcolor, "ii", (int *rgb, int *a), hudstate::setcolor(*rgb, *a));
+    ICOMMAND(hudalpha, "i", (int *a), hudstate::setalpha(*a));
+    ICOMMAND(hudpos, "ii", (int *x, int *y), hudstate::setxy(*x, *y));
+    ICOMMAND(hudsize, "ii", (int *w, int *h), {hudstate::w = *w; hudstate::h = *h;});
+    ICOMMAND(hudtextscale, "f", (float *s), {hudstate::scale = *s;});
+    ICOMMAND(hudtextheight, "i", (int *h), hudstate::textheight(*h));
+    ICOMMAND(hudalign, "ss", (char *ya, char *xa), {hudstate::xa = *xa | 32; hudstate::ya = *ya | 32;});
+    ICOMMAND(hudfont, "s", (char *font), setfont(font));
+    ICOMMAND(hudimage, "s", (char *img), hudstate::image(img));
+    ICOMMAND(hudrectangle, "", (), hudstate::rectangle());
+    ICOMMAND(hudtext, "s", (char *str), hudstate::text(str));
     // getting info for hud
-    ICOMMAND(hudp_health, "", (), intret(hudplayer()->health));
-    ICOMMAND(hudp_armour, "", (), intret(hudplayer()->armour));
-    ICOMMAND(hudp_armourtype, "", (), intret(hudplayer()->armourtype));
-    ICOMMAND(hudp_survivable, "", (), intret(hudplayer()->survivable()));
-    ICOMMAND(hudp_ammo, "i", (int *i), if(validgun(*i)) intret(hudplayer()->ammo[*i]));
-    ICOMMAND(hudp_magazine, "i", (int *i), if(validgun(*i)) intret(hudplayer()->magazine[*i]));
-    ICOMMAND(hudp_capacity, "i", (int *i), if(validgun(*i)) intret(guns[*i].capacity));
-    ICOMMAND(hudp_maxammo, "i", (int *i), if(*i >= GUN_SG && *i <= GUN_PISTOL) intret(itemstats[*i - GUN_SG].max));
-    ICOMMAND(hudp_gun, "", (), intret(hudplayer()->gunselect));
-    ICOMMAND(hudp_speed, "", (), intret(hudplayer()->vel.magnitude2()));
-    ICOMMAND(hudp_move, "", (), intret(hudplayer()->move));
-    ICOMMAND(hudp_strafe, "", (), intret(hudplayer()->strafe));
-    ICOMMAND(hudp_jumping, "", (), intret(hudplayer()->jumping));
-    ICOMMAND(hudp_attacking, "", (), intret(hudplayer()->attacking));
-    ICOMMAND(hudp_broadcast, "", (), result(currentbroadcast()));
+    ICOMMANDN(hud:aspect, hudp_aspect, "", (), floatret(hudstate::aspect));
+    ICOMMANDN(hud:left, hudp_left, "i", (int *x), intret(-1000.0f * hudstate::aspect + *x));
+    ICOMMANDN(hud:right, hudp_right, "i", (int *x), intret(1000.0f * hudstate::aspect - *x));
+    ICOMMANDN(hud:health, hudp_health, "", (), intret(hudplayer()->health));
+    ICOMMANDN(hud:armour, hudp_armour,  "", (), intret(hudplayer()->armour));
+    ICOMMANDN(hud:armourtype, hudp_armourtype, "", (), intret(hudplayer()->armourtype));
+    ICOMMANDN(hud:survivable, hudp_survivable, "", (), intret(hudplayer()->survivable()));
+    ICOMMANDN(hud:ammo, hudp_ammo, "i", (int *i), if(validgun(*i)) intret(hudplayer()->ammo[*i]));
+    ICOMMANDN(hud:magazine, hudp_magazine, "i", (int *i), if(validgun(*i)) intret(hudplayer()->magazine[*i]));
+    ICOMMANDN(hud:capacity, hudp_capacity, "i", (int *i), if(validgun(*i)) intret(guns[*i].capacity));
+    ICOMMANDN(hud:maxammo, hudp_maxammo, "i", (int *i), if(*i >= GUN_SG && *i <= GUN_PISTOL) intret(itemstats[*i - GUN_SG].max));
+    ICOMMANDN(hud:gun, hudp_gun, "", (), intret(hudplayer()->gunselect));
+    ICOMMANDN(hud:speed, hudp_speed, "", (), intret(hudplayer()->vel.magnitude2()));
+    ICOMMANDN(hud:move, hudp_move, "", (), intret(hudplayer()->move));
+    ICOMMANDN(hud:strafe, hudp_strafe, "", (), intret(hudplayer()->strafe));
+    ICOMMANDN(hud:jumping, hudp_jumping, "", (), intret(hudplayer()->jumping));
+    ICOMMANDN(hud:attacking, hudp_attacking, "", (), intret(hudplayer()->attacking));
+    ICOMMANDN(hud:broadcast, hudp_broadcast, "", (), result(currentbroadcast()));
     VARP(showkeys, 0, 0, 1);
     // clock
     VARP(clockup, 0, 0, 1);
