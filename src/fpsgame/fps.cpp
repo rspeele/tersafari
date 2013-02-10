@@ -903,7 +903,7 @@ namespace game
             case CS_SPECTATOR:
                 return 1;
             default:
-                return 1650.0f/1800.0f;
+                return 1600.0f/1800.0f;
         }
     }
 
