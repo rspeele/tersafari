@@ -2328,7 +2328,13 @@ VAR(hidehud, 0, 0, 1);
 VARP(crosshairsize, -1, 15, 50);
 VARP(cursorsize, 0, 30, 50);
 VARP(crosshairfx, 0, 1, 1);
-VARP(crosshaircolors, 0, 1, 1);
+vec xhaircolor(1.0f, 1.0f, 1.0f);
+HVARFP(crosshaircolor, 0, 0xFFFFFF, 0xFFFFFF, {
+        const float factor = 1.0f/0xff;
+        xhaircolor.x = factor * (crosshaircolor >> 16 & 0xff);
+        xhaircolor.y = factor * (crosshaircolor >> 8 & 0xff);
+        xhaircolor.z = factor * (crosshaircolor & 0xff);
+    });
 
 #define MAXCROSSHAIRS 4
 static Texture *crosshairs[MAXCROSSHAIRS] = { NULL, NULL, NULL, NULL };
@@ -2337,7 +2343,7 @@ void loadcrosshair(const char *name, int i)
 {
     if(i < 0 || i >= MAXCROSSHAIRS) return;
 	crosshairs[i] = name ? textureload(name, 3, true) : notexture;
-    if(crosshairs[i] == notexture) 
+    if(crosshairs[i] == notexture)
     {
         name = game::defaultcrosshair(i);
         if(!name) name = "data/crosshair.png";
@@ -2375,10 +2381,11 @@ void drawcrosshair(int w, int h)
     bool windowhit = g3d_windowhit(true, false);
     if(!windowhit && (hidehud || mainmenu)) return; //(hidehud || player->state==CS_SPECTATOR || player->state==CS_DEAD)) return;
 
-    float r = 1, g = 1, b = 1, cx = 0.5f, cy = 0.5f, chsize;
+    float r = xhaircolor.x, g = xhaircolor.y, b = xhaircolor.z, cx = 0.5f, cy = 0.5f, chsize;
     Texture *crosshair;
     if(windowhit)
     {
+        r = g = b = 1.0f;
         static Texture *cursor = NULL;
         if(!cursor) cursor = textureload("data/guicursor.png", 3, true);
         crosshair = cursor;
@@ -2386,13 +2393,17 @@ void drawcrosshair(int w, int h)
         g3d_cursorpos(cx, cy);
     }
     else
-    { 
-        int index = game::selectcrosshair(r, g, b);
+    {
+        float mr = 1.0f, mg = 1.0f, mb = 1.0f;
+        int index = game::selectcrosshair(mr, mg, mb);
         if(index < 0) return;
-        if(!crosshairfx) index = 0;
-        if(!crosshairfx || !crosshaircolors) r = g = b = 1;
+        if(crosshairfx)
+        {
+            r *= mr; g *= mg; b *= mb;
+        }
+        else index = 0;
         crosshair = crosshairs[index];
-        if(!crosshair) 
+        if(!crosshair)
         {
             loadcrosshair(NULL, index);
             crosshair = crosshairs[index];
