@@ -421,7 +421,7 @@ namespace game
             }
             string huddir = "packages/huds/";
             concatstring(huddir, name);
-            execfile(makerelpath(huddir, "init.cfg"));
+            execfile(makerelpath(huddir, "init.cfg"), false);
             char *buf = loadfile(makerelpath(huddir, "hud.cfg"), NULL);
             if (!buf)
             {
