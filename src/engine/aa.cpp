@@ -8,7 +8,7 @@ glmatrixf tqaaprevmvp;
 
 void loadtqaashaders()
 {
-    loadhdrshaders(!tqaapack ? AA_VELOCITY : AA_UNUSED);
+    loadhdrshaders(tqaapack ? AA_RESERVED : AA_VELOCITY);
 
     if(tqaamovemask) useshaderbyname("tqaamaskmovement");
     if(tqaapack) useshaderbyname("tqaapackvelocity");
@@ -39,6 +39,7 @@ void setuptqaa(int w, int h)
             case 2: tex = tqaamasktex; break;
         }
         glFramebufferTexture2D_(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_RECTANGLE_ARB, tex, 0);
+        if(i <= 1) bindgdepth();
         if(glCheckFramebufferStatus_(GL_FRAMEBUFFER_EXT) != GL_FRAMEBUFFER_COMPLETE_EXT)
             fatal("failed allocating TQAA buffer!");
     }
@@ -61,16 +62,18 @@ void cleanuptqaa()
 
 VARFP(tqaa, 0, 0, 1, cleanupaa());
 VARF(tqaapack, 0, 0, 1, cleanupaa());
-FVAR(tqaareproject, 0, 170, 1e3f);
+FVAR(tqaareproject, 0, 300, 1e3f);
 FVAR(tqaareprojectscale, 0, 4, 1e3f);
 VARFP(tqaamovemask, 0, 1, 1, cleanuptqaa());
 VARFP(tqaamovemaskreduce, 0, 0, 2, cleanuptqaa());
 VARFP(tqaamovemaskprec, 0, 1, 1, cleanuptqaa());
 VARP(tqaaquincunx, 0, 1, 1);
 
-void setaavelocityparams()
+void setaavelocityparams(GLenum tmu)
 {
-    glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gdepthtex);
+    if(tmu!=GL_TEXTURE0_ARB) glActiveTexture_(tmu);
+    if(msaasamples) glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, msdepthtex);
+    else glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gdepthtex);
     glMatrixMode(GL_TEXTURE);
     glmatrixf reproject;
     reproject.mul(tqaaframe ? tqaaprevmvp : screenmatrix, worldmatrix);
@@ -80,6 +83,7 @@ void setaavelocityparams()
     glMatrixMode(GL_MODELVIEW);
     float maxvel = sqrtf(vieww*vieww + viewh*viewh)/tqaareproject;
     LOCALPARAM(maxvelocity, (maxvel, 1/maxvel, tqaareprojectscale));
+    if(tmu!=GL_TEXTURE0_ARB) glActiveTexture_(GL_TEXTURE0_ARB);
 }
 
 void packtqaa(GLuint packfbo)
@@ -94,12 +98,16 @@ void packtqaa(GLuint packfbo)
             glClear(GL_COLOR_BUFFER_BIT);
         }
         SETSHADER(tqaamaskmovement);
-        glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gnormaltex);
+        if(msaasamples) glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, msnormaltex);
+        else glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gnormaltex);
         if(tqaamovemaskreduce)
         {
             glViewport(0, 0, maskw, maskh);
-            glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            if(!msaasamples)
+            {
+                glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            }
         }
         glBlendFunc(GL_ONE, GL_SRC_ALPHA);
         glEnable(GL_BLEND);
@@ -107,8 +115,11 @@ void packtqaa(GLuint packfbo)
         glDisable(GL_BLEND);
         if(tqaamovemaskreduce)
         {
-            glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            if(!msaasamples)
+            {
+                glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            }
             glViewport(0, 0, vieww, viewh);
         }
     }
@@ -131,7 +142,8 @@ void resolvetqaa(GLuint outfbo)
     glActiveTexture_(GL_TEXTURE1_ARB);
     glBindTexture(GL_TEXTURE_RECTANGLE_ARB, tqaaframe ? tqaaprevtex : tqaacurtex);
     glActiveTexture_(GL_TEXTURE2_ARB);
-    glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gdepthtex);
+    if(msaasamples) glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, msdepthtex);
+    else glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gdepthtex);
     if(tqaamovemask)
     {
        glActiveTexture_(GL_TEXTURE3_ARB);
@@ -167,7 +179,7 @@ void dotqaa(GLuint outfbo = 0)
     endtimer(tqaatimer);
 }
 
-GLuint fxaafbo = 0;
+GLuint fxaafbo = 0, fxaatex = 0;
 
 extern int fxaaquality, fxaagreenluma;
 
@@ -175,7 +187,7 @@ static Shader *fxaashader = NULL;
 
 void loadfxaashaders()
 {
-    loadhdrshaders(tqaa && !tqaapack ? AA_VELOCITY : (!fxaagreenluma ? AA_LUMA : AA_UNUSED));
+    loadhdrshaders(tqaa ? (tqaapack ? AA_RESERVED : AA_VELOCITY) : (!fxaagreenluma ? AA_LUMA : AA_UNUSED));
 
     string opts;
     int optslen = 0;
@@ -193,10 +205,12 @@ void clearfxaashaders()
 
 void setupfxaa(int w, int h)
 {
+    if(!fxaatex) glGenTextures(1, &fxaatex);
     if(!fxaafbo) glGenFramebuffers_(1, &fxaafbo);
     glBindFramebuffer_(GL_FRAMEBUFFER_EXT, fxaafbo);
-    GLuint tex = gcolortex;
-    glFramebufferTexture2D_(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_RECTANGLE_ARB, tex, 0);
+    createtexture(fxaatex, w, h, NULL, 3, 1, tqaa || !fxaagreenluma ? GL_RGBA8 : GL_RGB, GL_TEXTURE_RECTANGLE_ARB);
+    glFramebufferTexture2D_(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_RECTANGLE_ARB, fxaatex, 0);
+    bindgdepth();
     if(glCheckFramebufferStatus_(GL_FRAMEBUFFER_EXT) != GL_FRAMEBUFFER_COMPLETE_EXT)
         fatal("failed allocating FXAA buffer!");
     glBindFramebuffer_(GL_FRAMEBUFFER_EXT, 0);
@@ -207,6 +221,7 @@ void setupfxaa(int w, int h)
 void cleanupfxaa()
 {
     if(fxaafbo) { glDeleteFramebuffers_(1, &fxaafbo); fxaafbo = 0; }
+    if(fxaatex) { glDeleteTextures(1, &fxaatex); fxaatex = 0; }
 
     clearfxaashaders();
 }
@@ -223,19 +238,15 @@ void dofxaa(GLuint outfbo = 0)
 
     glBindFramebuffer_(GL_FRAMEBUFFER_EXT, tqaa ? tqaafbo[0] : outfbo);
     fxaashader->set();
-    glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gcolortex);
-    glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_RECTANGLE_ARB, fxaatex);
     screenquad(vieww, viewh);
-    glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
     if(tqaa) resolvetqaa(outfbo);
 
     endtimer(fxaatimer);
 }
  
-GLuint smaaareatex = 0, smaasearchtex = 0, smaafbo[3] = { 0, 0, 0 };
+GLuint smaaareatex = 0, smaasearchtex = 0, smaafbo[3] = { 0, 0, 0 }, smaatex[3] = { 0, 0, 0 };
 
 extern int smaaquality, smaagreenluma, smaacoloredge, smaadepthmask, smaastencil;
 
@@ -243,7 +254,7 @@ static Shader *smaalumaedgeshader = NULL, *smaacoloredgeshader = NULL, *smaablen
 
 void loadsmaashaders()
 {
-    loadhdrshaders(tqaa && !tqaapack ? AA_VELOCITY : (!smaagreenluma && !smaacoloredge ? AA_LUMA : AA_UNUSED));
+    loadhdrshaders(tqaa ? (tqaapack ? AA_RESERVED : AA_VELOCITY) : (!smaagreenluma && !smaacoloredge ? AA_LUMA : AA_UNUSED));
 
     string opts;
     int optslen = 0;
@@ -293,30 +304,19 @@ void setupsmaa(int w, int h)
     createtexture(smaasearchtex, SEARCHTEX_WIDTH, SEARCHTEX_HEIGHT, searchTexBytes, 3, 0, GL_LUMINANCE, GL_TEXTURE_RECTANGLE_ARB, 0, 0, 0, false);
     loopi(3)
     {
+        if(!smaatex[i]) glGenTextures(1, &smaatex[i]);
         if(!smaafbo[i]) glGenFramebuffers_(1, &smaafbo[i]);
         glBindFramebuffer_(GL_FRAMEBUFFER_EXT, smaafbo[i]);
-        GLuint tex = 0;
+        GLenum format = GL_RGB;
         switch(i)
         {
-            case 0: tex = gcolortex; break;
-            case 1: tex = gglowtex; break;
-            case 2: tex = gnormaltex; break;
-        }
-        glFramebufferTexture2D_(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_RECTANGLE_ARB, tex, 0);
-        if(i > 0 && (smaadepthmask || smaastencil))
-        {
-            if(gdepthformat)
-            {
-                glFramebufferRenderbuffer_(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_RENDERBUFFER_EXT, gdepthrb);
-                if(gdepthstencil && hasDS) glFramebufferRenderbuffer_(GL_FRAMEBUFFER_EXT, GL_STENCIL_ATTACHMENT_EXT, GL_RENDERBUFFER_EXT, gdepthrb);
-            }
-            else
-            {
-                glFramebufferTexture2D_(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_TEXTURE_RECTANGLE_ARB, gdepthtex, 0);
-                if(gdepthstencil && hasDS) glFramebufferTexture2D_(GL_FRAMEBUFFER_EXT, GL_STENCIL_ATTACHMENT_EXT, GL_TEXTURE_RECTANGLE_ARB, gdepthtex, 0);
-                else if(gstencil) glFramebufferRenderbuffer_(GL_FRAMEBUFFER_EXT, GL_STENCIL_ATTACHMENT_EXT, GL_RENDERBUFFER_EXT, gstencilrb);
-            }
-        }
+            case 0: format = tqaa || (!smaagreenluma && !smaacoloredge) ? GL_RGBA8 : GL_RGB; break;
+            case 1: format = hasTRG && !tqaa ? GL_RG8 : GL_RGBA8; break;
+            case 2: format = GL_RGBA8; break;
+        }  
+        createtexture(smaatex[i], w, h, NULL, 3, 1, format, GL_TEXTURE_RECTANGLE_ARB);
+        glFramebufferTexture2D_(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_RECTANGLE_ARB, smaatex[i], 0);
+        if(!i || (smaadepthmask || smaastencil)) bindgdepth();
         if(glCheckFramebufferStatus_(GL_FRAMEBUFFER_EXT) != GL_FRAMEBUFFER_COMPLETE_EXT)
             fatal("failed allocating SMAA buffer!");
     }
@@ -330,6 +330,7 @@ void cleanupsmaa()
     if(smaaareatex) { glDeleteTextures(1, &smaaareatex); smaaareatex = 0; }
     if(smaasearchtex) { glDeleteTextures(1, &smaasearchtex); smaasearchtex = 0; }
     loopi(3) if(smaafbo[i]) { glDeleteFramebuffers_(1, &smaafbo[i]); smaafbo[i] = 0; }
+    loopi(3) if(smaatex[i]) { glDeleteTextures(1, &smaatex[i]); smaatex[i] = 0; }
 
     clearsmaashaders();
 }
@@ -349,9 +350,9 @@ void viewsmaa()
     glColor3f(1, 1, 1);
     switch(debugsmaa)
     {
-        case 1: glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gcolortex); break;
-        case 2: glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gglowtex); break;
-        case 3: glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gnormaltex); break;
+        case 1: glBindTexture(GL_TEXTURE_RECTANGLE_ARB, smaatex[0]); break;
+        case 2: glBindTexture(GL_TEXTURE_RECTANGLE_ARB, smaatex[1]); break;
+        case 3: glBindTexture(GL_TEXTURE_RECTANGLE_ARB, smaatex[2]); break;
         case 4: glBindTexture(GL_TEXTURE_RECTANGLE_ARB, smaaareatex); tw = AREATEX_WIDTH; th = AREATEX_HEIGHT; break;
         case 5: glBindTexture(GL_TEXTURE_RECTANGLE_ARB, smaasearchtex); tw = SEARCHTEX_WIDTH; th = SEARCHTEX_HEIGHT; break;
     }
@@ -372,7 +373,7 @@ void dosmaa(GLuint outfbo = 0)
     if(smaadepthmask || smaastencil)
     {
         glClearColor(0, 0, 0, 0);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | (msaasamples ? GL_DEPTH_BUFFER_BIT | ((gdepthstencil && hasDS) || gstencil ? GL_STENCIL_BUFFER_BIT : 0) : 0));
     }
     if(smaadepthmask)
     {
@@ -383,16 +384,17 @@ void dosmaa(GLuint outfbo = 0)
     else if(smaastencil && ((gdepthstencil && hasDS) || gstencil))
     {
         glEnable(GL_STENCIL_TEST);
-        glStencilFunc(GL_ALWAYS, 8, 8);
+        glStencilFunc(GL_ALWAYS, 0x10, ~0);
         glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
     }
     if(smaacoloredge) smaacoloredgeshader->set();
     else smaalumaedgeshader->set();
-    glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gcolortex);
+    glBindTexture(GL_TEXTURE_RECTANGLE_ARB, smaatex[0]);
     if(tqaa)
     {
         glActiveTexture_(GL_TEXTURE1_ARB);
-        glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gnormaltex);
+        if(msaasamples) glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, msnormaltex);
+        else glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gnormaltex);
         glActiveTexture_(GL_TEXTURE0_ARB);
     }
     screenquad(vieww, viewh);
@@ -407,23 +409,19 @@ void dosmaa(GLuint outfbo = 0)
     }
     else if(smaastencil && ((gdepthstencil && hasDS) || gstencil))
     {
-        glStencilFunc(GL_EQUAL, 8, 8);
+        glStencilFunc(GL_EQUAL, 0x10, ~0);
         glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
     }
     if(smaadepthmask || smaastencil) glClear(GL_COLOR_BUFFER_BIT);
     smaablendweightshader->set();
     LOCALPARAM(subsamples, (tqaa ? (tqaaframe&1) + 1 : 0)); 
-    glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gglowtex);
-    glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_RECTANGLE_ARB, smaatex[1]);
     glActiveTexture_(GL_TEXTURE1_ARB);
     glBindTexture(GL_TEXTURE_RECTANGLE_ARB, smaaareatex);
     glActiveTexture_(GL_TEXTURE2_ARB);
     glBindTexture(GL_TEXTURE_RECTANGLE_ARB, smaasearchtex);
     glActiveTexture_(GL_TEXTURE0_ARB);
     screenquad(vieww, viewh);
-    glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     if(smaadepthmask)
     {
         glDisable(GL_DEPTH_TEST);
@@ -435,15 +433,11 @@ void dosmaa(GLuint outfbo = 0)
 
     glBindFramebuffer_(GL_FRAMEBUFFER_EXT, tqaa ? tqaafbo[0] : outfbo);
     smaaneighborhoodshader->set();
-    glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gcolortex);
-    glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_RECTANGLE_ARB, smaatex[0]);
     glActiveTexture_(GL_TEXTURE1_ARB);
-    glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gnormaltex);
+    glBindTexture(GL_TEXTURE_RECTANGLE_ARB, smaatex[2]);
     glActiveTexture_(GL_TEXTURE0_ARB);
     screenquad(vieww, viewh);
-    glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
     if(tqaa) resolvetqaa(outfbo);
 
@@ -495,9 +489,9 @@ bool maskedaa()
    
 void doaa(GLuint outfbo, void (*resolve)(GLuint, int))
 {
-    if(smaa) { resolve(smaafbo[0], tqaa && !tqaapack ? AA_VELOCITY : (!smaagreenluma && !smaacoloredge ? AA_LUMA : AA_UNUSED)); dosmaa(outfbo); }
-    else if(fxaa) { resolve(fxaafbo, tqaa && !tqaapack ? AA_VELOCITY : (!fxaagreenluma ? AA_LUMA : AA_UNUSED)); dofxaa(outfbo); }
-    else if(tqaa) { resolve(tqaafbo[0], !tqaapack ? AA_VELOCITY : AA_UNUSED); dotqaa(outfbo); }
+    if(smaa) { resolve(smaafbo[0], tqaa ? (tqaapack ? AA_RESERVED : AA_VELOCITY) : (!smaagreenluma && !smaacoloredge ? AA_LUMA : AA_UNUSED)); dosmaa(outfbo); }
+    else if(fxaa) { resolve(fxaafbo, tqaa ? (tqaapack ? AA_RESERVED : AA_VELOCITY) : (!fxaagreenluma ? AA_LUMA : AA_UNUSED)); dofxaa(outfbo); }
+    else if(tqaa) { resolve(tqaafbo[0], tqaapack ? AA_RESERVED : AA_VELOCITY); dotqaa(outfbo); }
     else resolve(outfbo, AA_UNUSED);
 }
 
