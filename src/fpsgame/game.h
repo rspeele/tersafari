@@ -266,13 +266,13 @@ static const int msgsizes[] =               // size inclusive message token, 0 f
     -1
 };
 
-#define SAUERBRATEN_LANINFO_PORT 28784
-#define SAUERBRATEN_SERVER_PORT 28785
-#define SAUERBRATEN_SERVINFO_PORT 28786
-#define SAUERBRATEN_MASTER_PORT 28787
-#define PROTOCOL_VERSION 267            // bump when protocol changes
+#define TERSAFARI_LANINFO_PORT 29784
+#define TERSAFARI_SERVER_PORT 29785
+#define TERSAFARI_SERVINFO_PORT 29786
+#define TERSAFARI_MASTER_PORT 29787
+#define PROTOCOL_VERSION 0              // bump when protocol changes
 #define DEMO_VERSION 1                  // bump when demo format changes
-#define DEMO_MAGIC "SAUERBRATEN_DEMO"
+#define DEMO_MAGIC "TERSAFARI_DEMO"
 
 struct demoheader
 {

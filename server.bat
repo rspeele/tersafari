@@ -1,12 +1,12 @@
 @ECHO OFF
 
-set TESS_BIN=bin
+set TSF_BIN=bin
 
 IF /I "%PROCESSOR_ARCHITECTURE%" == "amd64" (
-    set TESS_BIN=bin64
+    set TSF_BIN=bin64
 )
 IF /I "%PROCESSOR_ARCHITEW6432%" == "amd64" (
-    set TESS_BIN=bin64
+    set TSF_BIN=bin64
 )
 
-start %TESS_BIN%\tesseract.exe "-q$HOME\My Games\Tesseract" -ktesseract -gserver-log.txt -d %*
+start %TSF_BIN%\tersafari.exe "-q$HOME\My Games\Tersafari" -ktesseract -ktsfmod -gserver-log.txt -d %*
