@@ -668,7 +668,6 @@ void consolekey(int code, bool isdown, int cooked)
             inputcommand(NULL);
         }
     }
-    conoutf("%d", commandpos);
 }
 
 extern bool menukey(int code, bool isdown, int cooked);
