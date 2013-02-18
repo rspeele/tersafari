@@ -107,9 +107,9 @@ extern void mpdelcube(selinfo &sel, bool local);
 extern void mpremip(bool local);
 
 // command
-extern int variable(const char *name, int min, int cur, int max, int *storage, identfun fun, int flags);
-extern float fvariable(const char *name, float min, float cur, float max, float *storage, identfun fun, int flags);
-extern char *svariable(const char *name, const char *cur, char **storage, identfun fun, int flags);
+extern int variable(const char *name, int min, int cur, int max, int *storage, identfun fun, int flags, docstr doc = NULL);
+extern float fvariable(const char *name, float min, float cur, float max, float *storage, identfun fun, int flags, docstr doc = NULL);
+extern char *svariable(const char *name, const char *cur, char **storage, identfun fun, int flags, docstr doc = NULL);
 extern void setvar(const char *name, int i, bool dofunc = true, bool doclamp = true);
 extern void setfvar(const char *name, float f, bool dofunc = true, bool doclamp = true);
 extern void setsvar(const char *name, const char *str, bool dofunc = true);
@@ -125,7 +125,7 @@ extern ident *getident(const char *name);
 extern ident *newident(const char *name, int flags = 0);
 extern ident *readident(const char *name);
 extern ident *writeident(const char *name, int flags = 0);
-extern bool addcommand(const char *name, identfun fun, const char *narg);
+extern bool addcommand(const char *name, identfun fun, const char *narg, docstr doc = NULL);
 extern bool addkeyword(int type, const char *name);
 extern uint *compilecode(const char *p);
 extern void keepcode(uint *p);

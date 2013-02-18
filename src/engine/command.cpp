@@ -478,21 +478,21 @@ ICOMMAND(alias, "st", (const char *name, tagval *v),
 
 // variable's and commands are registered through globals, see cube.h
 
-int variable(const char *name, int min, int cur, int max, int *storage, identfun fun, int flags)
+int variable(const char *name, int min, int cur, int max, int *storage, identfun fun, int flags, docstr doc)
 {
-    addident(ident(ID_VAR, name, min, max, storage, (void *)fun, flags));
+    addident(ident(ID_VAR, name, min, max, storage, (void *)fun, flags, doc));
     return cur;
 }
 
-float fvariable(const char *name, float min, float cur, float max, float *storage, identfun fun, int flags)
+float fvariable(const char *name, float min, float cur, float max, float *storage, identfun fun, int flags, docstr doc)
 {
-    addident(ident(ID_FVAR, name, min, max, storage, (void *)fun, flags));
+    addident(ident(ID_FVAR, name, min, max, storage, (void *)fun, flags, doc));
     return cur;
 }
 
-char *svariable(const char *name, const char *cur, char **storage, identfun fun, int flags)
+char *svariable(const char *name, const char *cur, char **storage, identfun fun, int flags, docstr doc)
 {
-    addident(ident(ID_SVAR, name, storage, (void *)fun, flags));
+    addident(ident(ID_SVAR, name, storage, (void *)fun, flags, doc));
     return newstring(cur);
 }
 
@@ -664,7 +664,7 @@ void setsvarchecked(ident *id, const char *val)
     }
 }
 
-bool addcommand(const char *name, identfun fun, const char *args)
+bool addcommand(const char *name, identfun fun, const char *args, docstr doc)
 {
     uint argmask = 0;
     int numargs = 0;
@@ -678,7 +678,7 @@ bool addcommand(const char *name, identfun fun, const char *args)
         default: fatal("builtin %s declared with illegal type: %s", name, args); break;
     }
     if(limit && numargs > 8) fatal("builtin %s declared with too many args: %d", name, numargs);
-    addident(ident(ID_COMMAND, name, args, argmask, (void *)fun));
+    addident(ident(ID_COMMAND, name, args, argmask, (void *)fun, 0, doc));
     return false;
 }
 
