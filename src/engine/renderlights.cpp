@@ -243,10 +243,10 @@ void viewao()
     glBindTexture(GL_TEXTURE_RECTANGLE_ARB, aotex[2] ? aotex[2] : aotex[0]);
     int tw = aotex[2] ? gw : aow, th = aotex[2] ? gh : aoh;
     glBegin(GL_TRIANGLE_STRIP);
-    glTexCoord2f(0, th); glVertex2i(0, 0);
-    glTexCoord2f(tw, th); glVertex2i(w, 0);
-    glTexCoord2f(0, 0); glVertex2i(0, h);
-    glTexCoord2f(tw, 0); glVertex2i(w, h);
+    glTexCoord2f(0, th); glVertex2f(0, 0);
+    glTexCoord2f(tw, th); glVertex2f(w, 0);
+    glTexCoord2f(0, 0); glVertex2f(0, h);
+    glTexCoord2f(tw, 0); glVertex2f(w, h);
     glEnd();
     notextureshader->set();
 }
@@ -347,7 +347,7 @@ void cleanupscale()
     scalew = scaleh = -1;
 }
 
-extern int gscalecubic;
+extern int gscalecubic, gscalenearest;
 
 void setupscale(int sw, int sh, int w, int h)
 {
@@ -361,7 +361,7 @@ void setupscale(int sw, int sh, int w, int h)
 
         glBindFramebuffer_(GL_FRAMEBUFFER_EXT, scalefbo[i]);
 
-        createtexture(scaletex[i], sw, i ? h : sh, NULL, 3, 1, GL_RGB, GL_TEXTURE_RECTANGLE_ARB);
+        createtexture(scaletex[i], sw, i ? h : sh, NULL, 3, gscalecubic || !gscalenearest ? 1 : 0, GL_RGB, GL_TEXTURE_RECTANGLE_ARB);
 
         glFramebufferTexture2D_(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_RECTANGLE_ARB, scaletex[i], 0);
         if(!i) bindgdepth();
@@ -419,6 +419,7 @@ void doscale(int w, int h)
 VARFP(glineardepth, 0, 0, 3, initwarning("g-buffer setup", INIT_LOAD, CHANGE_SHADERS));
 VAR(gdepthformat, 1, 0, 0);
 VARFP(msaa, 0, 0, 16, initwarning("MSAA setup", INIT_LOAD, CHANGE_SHADERS));
+VARFP(csaa, 0, 0, 16, initwarning("MSAA setup", INIT_LOAD, CHANGE_SHADERS));
 VARF(msaadepthstencil, 0, 1, 1, cleanupgbuffer());
 VARF(msaastencil, 0, 0, 1, cleanupgbuffer());
 VARF(msaaedgedetect, 0, 1, 1, cleanupgbuffer());
@@ -430,10 +431,12 @@ VAR(msaamaxsamples, 1, 0, 0);
 VAR(msaamaxdepthtexsamples, 1, 0, 0);
 VAR(msaamaxcolortexsamples, 1, 0, 0);
 VAR(msaasamples, 1, 0, 0);
+VAR(msaamincolorsamples, 1, 0, 0);
+VAR(msaacolorsamples, 1, 0, 0);
 
 void initgbuffer()
 {
-    msaamaxsamples = msaamaxdepthtexsamples = msaamaxcolortexsamples = msaasamples = 0;
+    msaamaxsamples = msaamaxdepthtexsamples = msaamaxcolortexsamples = msaasamples = msaamincolorsamples = msaacolorsamples = 0;
     if(hasFBMS && hasFBB && hasTMS)
     {
         GLint val;
@@ -445,10 +448,21 @@ void initgbuffer()
         msaamaxcolortexsamples = val;
     }
 
-    if(min(msaa, min(msaamaxsamples, msaamaxcolortexsamples)) >= 2)
+    int maxsamples = min(msaamaxsamples, msaamaxcolortexsamples), samples = min(max(msaa, csaa), maxsamples);
+    if(samples >= 2)
     {
         msaasamples = 2;
-        while(msaasamples*2 <= min(msaa, min(msaamaxsamples, msaamaxcolortexsamples))) msaasamples *= 2;
+        while(msaasamples*2 <= samples) msaasamples *= 2;
+        if(hasNVFBMSC && hasNVTMS)
+        {
+            if(msaa)
+            {
+                int colorsamples = min(msaa, maxsamples);
+                msaamincolorsamples = 2;
+                while(msaamincolorsamples*2 <= colorsamples) msaamincolorsamples *= 2;
+            }
+        }
+        else msaamincolorsamples = msaasamples;
     }
 
     int lineardepth = glineardepth;
@@ -497,6 +511,7 @@ void cleanupmsbuffer()
     if(mshdrtex) { glDeleteTextures(1, &mshdrtex); mshdrtex = 0; }
     if(msrefractfbo) { glDeleteFramebuffers_(1, &msrefractfbo); msrefractfbo = 0; }
     if(msrefracttex) { glDeleteTextures(1, &msrefracttex); msrefracttex = 0; }
+    msaacolorsamples = 0;
 }
 
 void bindmsdepth()
@@ -513,6 +528,22 @@ void bindmsdepth()
         if(msaadepthstencil && hasDS) glFramebufferTexture2D_(GL_FRAMEBUFFER_EXT, GL_STENCIL_ATTACHMENT_EXT, GL_TEXTURE_2D_MULTISAMPLE, msdepthtex, 0);
         else if(msaastencil) glFramebufferRenderbuffer_(GL_FRAMEBUFFER_EXT, GL_STENCIL_ATTACHMENT_EXT, GL_RENDERBUFFER_EXT, msstencilrb);
     }
+}
+
+static void texms(GLenum format, int w, int h, GLenum fixed)
+{
+    if(msaamincolorsamples < msaasamples)
+        glTexImage2DMultisampleCoverageNV_(GL_TEXTURE_2D_MULTISAMPLE, msaasamples, msaamincolorsamples, format, w, h, fixed);
+    else
+        glTexImage2DMultisample_(GL_TEXTURE_2D_MULTISAMPLE, msaasamples, format, w, h, fixed);
+}
+
+static void rbms(GLenum format, int w, int h)
+{
+    if(msaamincolorsamples < msaasamples)
+        glRenderbufferStorageMultisampleCoverageNV_(GL_RENDERBUFFER_EXT, msaasamples, msaamincolorsamples, format, w, h);
+    else
+        glRenderbufferStorageMultisample_(GL_RENDERBUFFER_EXT, msaasamples, format, w, h);
 }
 
 void setupmsbuffer(int w, int h)
@@ -532,32 +563,34 @@ void setupmsbuffer(int w, int h)
 
     GLenum fixed = hasMSS && multisampledaa() ? GL_TRUE : GL_FALSE;
 
-    static const GLenum depthformats[] = { GL_RGBA8, GL_R16F, GL_R32F };
-    GLenum depthformat = gdepthformat ? depthformats[gdepthformat-1] : (msaadepthstencil && hasDS ? GL_DEPTH24_STENCIL8_EXT : GL_DEPTH_COMPONENT);
-    glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, msdepthtex);
-    glTexImage2DMultisample_(GL_TEXTURE_2D_MULTISAMPLE, msaasamples, depthformat, w, h, fixed);
- 
-    glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, mscolortex);
-    glTexImage2DMultisample_(GL_TEXTURE_2D_MULTISAMPLE, msaasamples, GL_RGBA8, w, h, fixed);
-    glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, msnormaltex);
-    glTexImage2DMultisample_(GL_TEXTURE_2D_MULTISAMPLE, msaasamples, GL_RGBA8, w, h, fixed);
-    glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, msglowtex);
-    glTexImage2DMultisample_(GL_TEXTURE_2D_MULTISAMPLE, msaasamples, GL_RGBA8, w, h, fixed);
-
     if(gdepthformat)
     {
         if(!msdepthrb) glGenRenderbuffers_(1, &msdepthrb);
         glBindRenderbuffer_(GL_RENDERBUFFER_EXT, msdepthrb);
-        glRenderbufferStorageMultisample_(GL_RENDERBUFFER_EXT, msaasamples, msaadepthstencil && hasDS ? GL_DEPTH24_STENCIL8_EXT : GL_DEPTH_COMPONENT, w, h);
+        rbms(msaadepthstencil && hasDS ? GL_DEPTH24_STENCIL8_EXT : GL_DEPTH_COMPONENT, w, h);
         glBindRenderbuffer_(GL_RENDERBUFFER_EXT, 0);
+        fixed = GL_TRUE; // spec requires fixed sample locations if renderbuffers are used with textures
     }
     if(msaastencil && (!msaadepthstencil || !hasDS))
     {
         if(!msstencilrb) glGenRenderbuffers_(1, &msstencilrb);
         glBindRenderbuffer_(GL_RENDERBUFFER_EXT, msstencilrb);
-        glRenderbufferStorageMultisample_(GL_RENDERBUFFER_EXT, msaasamples, GL_STENCIL_INDEX8_EXT, w, h);
+        rbms(GL_STENCIL_INDEX8_EXT, w, h);
         glBindRenderbuffer_(GL_RENDERBUFFER_EXT, 0);
+        fixed = GL_TRUE; // spec requires fixed sample locations if renderbuffers are used with textures
     }
+
+    static const GLenum depthformats[] = { GL_RGBA8, GL_R16F, GL_R32F };
+    GLenum depthformat = gdepthformat ? depthformats[gdepthformat-1] : (msaadepthstencil && hasDS ? GL_DEPTH24_STENCIL8_EXT : GL_DEPTH_COMPONENT);
+    glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, msdepthtex);
+    texms(depthformat, w, h, fixed);
+ 
+    glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, mscolortex);
+    texms(GL_RGBA8, w, h, fixed);
+    glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, msnormaltex);
+    texms(GL_RGBA8, w, h, fixed);
+    glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, msglowtex);
+    texms(GL_RGBA8, w, h, fixed);
 
     bindmsdepth();
     glFramebufferTexture2D_(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D_MULTISAMPLE, mscolortex, 0);
@@ -567,6 +600,10 @@ void setupmsbuffer(int w, int h)
 
     if(glCheckFramebufferStatus_(GL_FRAMEBUFFER_EXT) != GL_FRAMEBUFFER_COMPLETE_EXT)
         fatal("failed allocating MSAA g-buffer!");
+
+    GLint colorsamples = msaasamples;
+    if(msaamincolorsamples < msaasamples) glGetTexLevelParameteriv(GL_TEXTURE_2D_MULTISAMPLE, 0, GL_TEXTURE_COLOR_SAMPLES_NV, &colorsamples);
+    msaacolorsamples = colorsamples;
 
     memset(msaapositions, 0, sizeof(msaapositions));
     if(fixed) loopi(msaasamples) 
@@ -589,7 +626,7 @@ void setupmsbuffer(int w, int h)
         GLenum format = gethdrformat(prec);
         glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, mshdrtex);
         glGetError();
-        glTexImage2DMultisample_(GL_TEXTURE_2D_MULTISAMPLE, msaasamples, format, w, h, fixed);
+        texms(format, w, h, fixed);
         if(glGetError() == GL_NO_ERROR)
         {
             glFramebufferTexture2D_(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D_MULTISAMPLE, mshdrtex, 0);
@@ -610,7 +647,7 @@ void setupmsbuffer(int w, int h)
     glBindFramebuffer_(GL_FRAMEBUFFER_EXT, msrefractfbo);
 
     glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, msrefracttex);
-    glTexImage2DMultisample_(GL_TEXTURE_2D_MULTISAMPLE, msaasamples, GL_RGB, w, h, fixed);
+    texms(GL_RGB, w, h, fixed);
 
     glFramebufferTexture2D_(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D_MULTISAMPLE, msrefracttex, 0);
     bindmsdepth();
@@ -622,6 +659,8 @@ void setupmsbuffer(int w, int h)
 
     useshaderbyname("msaaedgedetect");
     useshaderbyname("msaaresolve");
+    useshaderbyname("msaareducew");
+    useshaderbyname("msaareduce");
     if(hasMSS && msaatonemap)
     {
         useshaderbyname("msaatonemap");
@@ -808,6 +847,7 @@ FVARR(hdrbright, 1e-4f, 1.0f, 1e4f);
 FVAR(hdrsaturate, 1e-3f, 0.8f, 1e3f);
 VARFP(gscale, 25, 100, 100, cleanupgbuffer());
 VARFP(gscalecubic, 0, 0, 1, cleanupgbuffer());
+VARFP(gscalenearest, 0, 0, 1, cleanupgbuffer());
 FVARFP(gscalecubicsoft, 0, 0, 1, initwarning("scaling setup", INIT_LOAD, CHANGE_SHADERS));
 
 float ldrscale = 1.0f, ldrscaleb = 1.0f/255;
@@ -874,11 +914,13 @@ void loadhdrshaders(int aa)
 
 void processldr(GLuint outfbo, int aa)
 {
+    timer *ldrtimer = begintimer("ldr processing");
+
     if(aa >= AA_SPLIT)
     {
         glBindFramebuffer_(GL_FRAMEBUFFER_EXT, outfbo);
         glViewport(0, 0, vieww, viewh);
-        glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, mshdrfbo);
+        glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, mshdrtex);
         switch(aa)
         {
             case AA_SPLIT_LUMA: SETSHADER(msaasplitluma); break;
@@ -889,6 +931,8 @@ void processldr(GLuint outfbo, int aa)
             default: SETSHADER(msaasplit); break;
         }
         screenquad(vieww, viewh);
+
+        endtimer(ldrtimer);
         return;
     }
 
@@ -913,6 +957,8 @@ void processldr(GLuint outfbo, int aa)
     }
     glBindTexture(GL_TEXTURE_RECTANGLE_ARB, hdrtex);
     screenquad(vieww, viewh);
+    
+    endtimer(ldrtimer);
 }
 
 void processhdr(GLuint outfbo, int aa)
@@ -947,8 +993,26 @@ void processhdr(GLuint outfbo, int aa)
         else
         {
             glBindFramebuffer_(GL_FRAMEBUFFER_EXT, hdrfbo);
-            glViewport(0, 0, vieww, viewh);
-            SETSHADER(msaaresolve);
+            if(vieww/2 >= bloomw)
+            {
+                pw = vieww/2;
+                if(viewh/2 >= bloomh)
+                {
+                    ph = viewh/2;
+                    glViewport(0, 0, pw, ph);
+                    SETSHADER(msaareduce);
+                }
+                else
+                {
+                    glViewport(0, 0, pw, viewh);
+                    SETSHADER(msaareducew);
+                }
+            }
+            else
+            {
+                glViewport(0, 0, vieww, viewh);
+                SETSHADER(msaaresolve);
+            }
             glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, mshdrtex);
             screenquad(vieww, viewh);
         }
@@ -958,11 +1022,15 @@ void processhdr(GLuint outfbo, int aa)
         GLuint cfbo = b1fbo, ctex = b1tex;
         int cw = max(pw/2, bloomw), ch = max(ph/2, bloomh);
 
-        if(hdrreduce > 1 && cw/2 >= bloomw && ch/2 >= bloomh)
+        if(hdrreduce > 1 && cw/2 >= bloomw)
         {
             cw /= 2;
-            ch /= 2;
-            SETSHADER(hdrreduce2);
+            if(ch/2 >= bloomh)
+            {
+                ch /= 2;
+                SETSHADER(hdrreduce2);
+            }
+            else SETSHADER(hdrreduce2w);
         }
         else SETSHADER(hdrreduce);
         if(cw == bloomw && ch == bloomh) { if(bloomfbo[5]) { cfbo = bloomfbo[5]; ctex = bloomtex[5]; } else { cfbo = bloomfbo[2]; ctex = bloomtex[2]; } }
@@ -988,11 +1056,15 @@ void processhdr(GLuint outfbo, int aa)
         {
             int cw = max(lw/2, 2), ch = max(lh/2, 2);
 
-            if(hdrreduce > 1 && cw/2 >= 2 && ch/2 >= 2)
+            if(hdrreduce > 1 && cw/2 >= 2)
             {
                 cw /= 2;
-                ch /= 2;
-                if(i) SETSHADER(hdrreduce2); else SETSHADER(hdrluminance2);
+                if(ch/2 >= 2)
+                {
+                    ch /= 2;
+                    if(i) SETSHADER(hdrreduce2); else SETSHADER(hdrluminance2);
+                }
+                else if(i) SETSHADER(hdrreduce2w); else SETSHADER(hdrluminance2w);
             }
             else if(i) SETSHADER(hdrreduce); else SETSHADER(hdrluminance);
             glBindFramebuffer_(GL_FRAMEBUFFER_EXT, b1fbo);
@@ -1189,10 +1261,10 @@ void viewdepth()
     glColor3f(1, 1, 1);
     glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gdepthtex);
     glBegin(GL_TRIANGLE_STRIP);
-    glTexCoord2f(0, gh); glVertex2i(0, 0);
-    glTexCoord2f(gw, gh); glVertex2i(w, 0);
-    glTexCoord2f(0, 0); glVertex2i(0, h);
-    glTexCoord2f(gw, 0); glVertex2i(w, h);
+    glTexCoord2f(0, gh); glVertex2f(0, 0);
+    glTexCoord2f(gw, gh); glVertex2f(w, 0);
+    glTexCoord2f(0, 0); glVertex2f(0, h);
+    glTexCoord2f(gw, 0); glVertex2f(w, h);
     glEnd();
     notextureshader->set();
 }
@@ -1206,10 +1278,10 @@ void viewrefract()
     glColor3f(1, 1, 1);
     glBindTexture(GL_TEXTURE_RECTANGLE_ARB, refracttex);
     glBegin(GL_TRIANGLE_STRIP);
-    glTexCoord2f(0, gh); glVertex2i(0, 0);
-    glTexCoord2f(gw, gh); glVertex2i(w, 0);
-    glTexCoord2f(0, 0); glVertex2i(0, h);
-    glTexCoord2f(gw, 0); glVertex2i(w, h);
+    glTexCoord2f(0, gh); glVertex2f(0, 0);
+    glTexCoord2f(gw, gh); glVertex2f(w, 0);
+    glTexCoord2f(0, 0); glVertex2f(0, h);
+    glTexCoord2f(gw, 0); glVertex2f(w, h);
     glEnd();
     notextureshader->set();
 }
@@ -1346,10 +1418,10 @@ void viewrsm()
     glColor3f(1, 1, 1);
     glBindTexture(GL_TEXTURE_RECTANGLE_ARB, debugrsm == 2 ? rsmnormaltex : rsmcolortex);
     glBegin(GL_TRIANGLE_STRIP);
-    glTexCoord2f(0, 0); glVertex2i(screen->w-w, screen->h-h);
-    glTexCoord2f(rsmsize, 0); glVertex2i(screen->w, screen->h-h);
-    glTexCoord2f(0, rsmsize); glVertex2i(screen->w-w, screen->h);
-    glTexCoord2f(rsmsize, rsmsize); glVertex2i(screen->w, screen->h);
+    glTexCoord2f(0, 0); glVertex2f(screen->w-w, screen->h-h);
+    glTexCoord2f(rsmsize, 0); glVertex2f(screen->w, screen->h-h);
+    glTexCoord2f(0, rsmsize); glVertex2f(screen->w-w, screen->h);
+    glTexCoord2f(rsmsize, rsmsize); glVertex2f(screen->w, screen->h);
     glEnd();
     notextureshader->set();
 }
@@ -1363,10 +1435,10 @@ void viewrh()
     glBindTexture(GL_TEXTURE_3D, rhtex[1]);
     float z = (debugrh-1+0.5f)/float((rhgrid+2*rhborder)*rhsplits);
     glBegin(GL_TRIANGLE_STRIP);
-    glTexCoord3f(0, 0, z); glVertex2i(screen->w-w, screen->h-h);
-    glTexCoord3f(1, 0, z); glVertex2i(screen->w, screen->h-h);
-    glTexCoord3f(0, 1, z); glVertex2i(screen->w-w, screen->h);
-    glTexCoord3f(1, 1, z); glVertex2i(screen->w, screen->h);
+    glTexCoord3f(0, 0, z); glVertex2f(screen->w-w, screen->h-h);
+    glTexCoord3f(1, 0, z); glVertex2f(screen->w, screen->h-h);
+    glTexCoord3f(0, 1, z); glVertex2f(screen->w-w, screen->h);
+    glTexCoord3f(1, 1, z); glVertex2f(screen->w, screen->h);
     glEnd();
     notextureshader->set();
 }
@@ -1494,10 +1566,10 @@ void viewshadowatlas()
     glBindTexture(shadowatlastarget, shadowatlastex);
     if(usesmcomparemode()) setsmnoncomparemode();
     glBegin(GL_TRIANGLE_STRIP);
-    glTexCoord2f(0, 0); glVertex2i(screen->w-w, screen->h-h);
-    glTexCoord2f(tw, 0); glVertex2i(screen->w, screen->h-h);
-    glTexCoord2f(0, th); glVertex2i(screen->w-w, screen->h);
-    glTexCoord2f(tw, th); glVertex2i(screen->w, screen->h);
+    glTexCoord2f(0, 0); glVertex2f(screen->w-w, screen->h-h);
+    glTexCoord2f(tw, 0); glVertex2f(screen->w, screen->h-h);
+    glTexCoord2f(0, th); glVertex2f(screen->w-w, screen->h);
+    glTexCoord2f(tw, th); glVertex2f(screen->w, screen->h);
     glEnd();
     if(usesmcomparemode()) setsmcomparemode();
     notextureshader->set();
@@ -2687,10 +2759,6 @@ void renderlights(float bsx1 = -1, float bsy1 = -1, float bsx2 = 1, float bsy2 =
         glDepthMask(GL_TRUE);
         if(hasDBT && depthtestlights > 1) glDisable(GL_DEPTH_BOUNDS_TEST_EXT);
     }
-
-    glMatrixMode(GL_TEXTURE);
-    glLoadIdentity();
-    glMatrixMode(GL_MODELVIEW);
 }
 
 VAR(oqlights, 0, 1, 1);
@@ -3713,6 +3781,11 @@ void preparegbuffer(bool depthclear)
     glBindFramebuffer_(GL_FRAMEBUFFER_EXT, msaasamples ? msfbo : gfbo);
     glViewport(0, 0, vieww, viewh);
 
+    if(drawtex)
+    {
+        glEnable(GL_SCISSOR_TEST);
+        glScissor(0, 0, vieww, viewh);
+    }
     if(gdepthformat && gdepthclear)
     {
         maskgbuffer("d");
@@ -3724,6 +3797,7 @@ void preparegbuffer(bool depthclear)
     if(gcolorclear) glClearColor(0, 0, 0, 0);
     glClear((depthclear ? GL_DEPTH_BUFFER_BIT : 0)|(gcolorclear ? GL_COLOR_BUFFER_BIT : 0)|(depthclear && stencilformat ? GL_STENCIL_BUFFER_BIT : 0));
     if(gdepthformat && gdepthclear) maskgbuffer("cngd");
+    if(drawtex) glDisable(GL_SCISSOR_TEST);
 
     glmatrixf invscreenmatrix;
     invscreenmatrix.identity();
@@ -3876,10 +3950,6 @@ void shademodelpreview(int x, int y, int w, int h, bool background, bool scissor
         if(scissor) glDisable(GL_SCISSOR_TEST);
         glDisable(GL_BLEND);
     }
-
-    glMatrixMode(GL_TEXTURE);
-    glLoadIdentity();
-    glMatrixMode(GL_MODELVIEW);
 
     GLERROR;
     

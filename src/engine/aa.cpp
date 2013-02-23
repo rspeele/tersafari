@@ -127,26 +127,22 @@ void packtqaa()
 void resolvetqaa(GLuint outfbo)
 {
     glBindFramebuffer_(GL_FRAMEBUFFER_EXT, outfbo);
+    if(tqaamovemask)
+    {
+        SETSHADER(tqaaresolvemasked);
+        LOCALPARAM(movemaskscale, (1/float(1<<tqaamovemaskreduce)));
+    }
+    else SETSHADER(tqaaresolve);
     glBindTexture(GL_TEXTURE_RECTANGLE_ARB, tqaacurtex);
     glActiveTexture_(GL_TEXTURE1_ARB);
     glBindTexture(GL_TEXTURE_RECTANGLE_ARB, tqaaframe ? tqaaprevtex : tqaacurtex);
-    glActiveTexture_(GL_TEXTURE2_ARB);
-    if(msaasamples) glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, msdepthtex);
-    else glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gdepthtex);
+    setaavelocityparams(GL_TEXTURE2_ARB);
     if(tqaamovemask)
     {
        glActiveTexture_(GL_TEXTURE3_ARB);
        glBindTexture(GL_TEXTURE_RECTANGLE_ARB, tqaamasktex);
     }
     glActiveTexture_(GL_TEXTURE0_ARB);
-    if(tqaamovemask) 
-    {
-        SETSHADER(tqaaresolvemasked); 
-        LOCALPARAM(movemaskscale, (1/float(1<<tqaamovemaskreduce)));
-    }
-    else SETSHADER(tqaaresolve);
-    float maxvel = sqrtf(vieww*vieww + viewh*viewh)/tqaareproject;
-    LOCALPARAM(maxvelocity, (maxvel, 1/maxvel, tqaareprojectscale));
     vec4 quincunx(0, 0, 0, 0);
     if(tqaaquincunx) quincunx = tqaaframe&1 ? vec4(0.25f, 0.25f, -0.25f, -0.25f) : vec4(-0.25f, -0.25f, 0.25f, 0.25f);
     if(multisampledaa()) { quincunx.x *= 0.5f; quincunx.y *= -0.5f; quincunx.z *= 0.5f; quincunx.w *= -0.5f; }
@@ -251,9 +247,13 @@ void loadsmaashaders(bool split = false)
     string opts;
     int optslen = 0;
     if(smaadepthmask || smaastencil) opts[optslen++] = 'd';
-    if(split) opts[optslen++] = 'm';
+    if(split) opts[optslen++] = 's';
     if(smaagreenluma || tqaa) opts[optslen++] = 'g';
-    if(tqaa) opts[optslen++] = 't';
+    if(tqaa) 
+    {
+        opts[optslen++] = 't';
+        if(tqaamovemask) opts[optslen++] = 'm';
+    }
     opts[optslen] = '\0';
 
     defformatstring(lumaedgename)("SMAALumaEdgeDetection%d%s", smaaquality, opts);
@@ -554,7 +554,7 @@ void setupsmaa(int w, int h)
         switch(i)
         {
             case 0: format = tqaa || (!smaagreenluma && !smaacoloredge) ? GL_RGBA8 : GL_RGB; break;
-            case 1: format = hasTRG && !tqaa ? GL_RG8 : GL_RGBA8; break;
+            case 1: format = hasTRG ? GL_RG8 : GL_RGBA8; break;
             case 2: case 3: format = GL_RGBA8; break;
         }  
         createtexture(smaatex[i], w, h, NULL, 3, 1, format, GL_TEXTURE_RECTANGLE_ARB);
@@ -582,6 +582,8 @@ void cleanupsmaa()
     if(smaasearchtex) { glDeleteTextures(1, &smaasearchtex); smaasearchtex = 0; }
     loopi(4) if(smaafbo[i]) { glDeleteFramebuffers_(1, &smaafbo[i]); smaafbo[i] = 0; }
     loopi(5) if(smaatex[i]) { glDeleteTextures(1, &smaatex[i]); smaatex[i] = 0; }
+    smaasubsampleorder = -1;
+    smaat2x = smaas2x = smaa4x = 0;
 
     clearsmaashaders();
 }
@@ -617,11 +619,11 @@ void viewsmaa()
     notextureshader->set();
 }
 
-VAR(foo, 0, 1, 2);
-
 void dosmaa(GLuint outfbo = 0, bool split = false)
 {
     timer *smaatimer = begintimer("smaa");
+
+    if(tqaa) packtqaa();
 
     int cleardepth = msaasamples ? GL_DEPTH_BUFFER_BIT | ((gdepthstencil && hasDS) || gstencil ? GL_STENCIL_BUFFER_BIT : 0) : 0;
     loop(pass, split ? 2 : 1)
@@ -648,16 +650,7 @@ void dosmaa(GLuint outfbo = 0, bool split = false)
         if(smaacoloredge) smaacoloredgeshader->set();
         else smaalumaedgeshader->set();
         glBindTexture(GL_TEXTURE_RECTANGLE_ARB, smaatex[pass ? 4 : 0]);
-        if(tqaa)
-        {
-            glActiveTexture_(GL_TEXTURE1_ARB);
-            if(msaasamples) glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, msnormaltex);
-            else glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gnormaltex);
-            glActiveTexture_(GL_TEXTURE0_ARB);
-        }
         screenquad(vieww, viewh);
-
-        if(tqaa && !pass) packtqaa();
 
         glBindFramebuffer_(GL_FRAMEBUFFER_EXT, smaafbo[2 + pass]);
         if(smaadepthmask)
@@ -682,8 +675,13 @@ void dosmaa(GLuint outfbo = 0, bool split = false)
         glBindTexture(GL_TEXTURE_RECTANGLE_ARB, smaaareatex);
         glActiveTexture_(GL_TEXTURE2_ARB);
         glBindTexture(GL_TEXTURE_RECTANGLE_ARB, smaasearchtex);
+        if(tqaa && tqaamovemask)
+        {
+            glActiveTexture_(GL_TEXTURE3_ARB);
+            glBindTexture(GL_TEXTURE_RECTANGLE_ARB, tqaamasktex);
+        }
         glActiveTexture_(GL_TEXTURE0_ARB);
-        screenquad(vieww, viewh);
+        screenquadoffset(0, 0, vieww, viewh, -0.5f/(1<<tqaamovemaskreduce), -0.5f/(1<<tqaamovemaskreduce), vieww>>tqaamovemaskreduce, viewh>>tqaamovemaskreduce);
         if(smaadepthmask)
         {
             glDisable(GL_DEPTH_TEST);
