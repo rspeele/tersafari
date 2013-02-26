@@ -38,20 +38,21 @@ namespace game
         d->gunselect = gun;
     }
 
-    void nextweapon(int dir, bool force = false)
+    void nextweapon(int dir, bool force = false, const char *excludename = NULL)
     {
         if(player1->state!=CS_ALIVE) return;
         dir = (dir < 0 ? NUMGUNS-1 : 1);
         int gun = player1->gunselect;
+        int exclude = excludename ? getweapon(excludename) : -1;
         loopi(NUMGUNS)
         {
             gun = (gun + dir)%NUMGUNS;
-            if(force || player1->hasammo(gun)) break;
+            if(gun != exclude && (force || player1->hasammo(gun))) break;
         }
         if(gun != player1->gunselect) gunselect(gun, player1);
         else playsound(S_NOAMMO);
     }
-    ICOMMAND(nextweapon, "ii", (int *dir, int *force), nextweapon(*dir, *force!=0));
+    ICOMMAND(nextweapon, "iis", (int *dir, int *force, char *name), nextweapon(*dir, *force!=0, name));
 
     int getweapon(const char *name)
     {
