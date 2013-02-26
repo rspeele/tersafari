@@ -79,7 +79,7 @@ void cleanupbloom()
     lasthdraccum = 0;
 }
 
-extern int ao, aotaps, aoreduce, aoreducedepth, aonoise, aobilateral, aobilateralupscale, aopackdepth, aodepthformat, aoprec;
+extern int ao, aotaps, aoreduce, aoreducedepth, aonoise, aobilateral, aobilateralupscale, aopackdepth, aodepthformat, aoprec, aoderivnormal;
 
 static Shader *bilateralshader[2] = { NULL, NULL };
 
@@ -128,6 +128,7 @@ Shader *loadambientobscuranceshader()
 
     bool linear = aoreducedepth && (aoreduce || aoreducedepth > 1);
     if(linear) opts[optslen++] = 'l';
+    if(aoderivnormal) opts[optslen++] = 'd';
     if(aobilateral && aopackdepth) opts[optslen++] = 'p';
     opts[optslen] = '\0';
 
@@ -179,7 +180,7 @@ void setupao(int w, int h)
     {
         if(!aotex[3]) glGenTextures(1, &aotex[3]);
         if(!aofbo[3]) glGenFramebuffers_(1, &aofbo[3]);
-        createtexture(aotex[3], aow, aoh, NULL, 3, 0, aodepthformat ? GL_R16F : GL_RGBA8, GL_TEXTURE_RECTANGLE_ARB);
+        createtexture(aotex[3], aow, aoh, NULL, 3, 0, aodepthformat > 1 ? GL_R32F : (aodepthformat ? GL_R16F : GL_RGBA8), GL_TEXTURE_RECTANGLE_ARB);
         glBindFramebuffer_(GL_FRAMEBUFFER_EXT, aofbo[3]);
         glFramebufferTexture2D_(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_RECTANGLE_ARB, aotex[3], 0);
         if(glCheckFramebufferStatus_(GL_FRAMEBUFFER_EXT) != GL_FRAMEBUFFER_COMPLETE_EXT)
@@ -217,7 +218,7 @@ FVARP(aosigma, 0.005f, 0.5f, 2.0f);
 VARP(aoiter, 0, 0, 4);
 VARFP(aoreduce, 0, 1, 2, cleanupao());
 VARF(aoreducedepth, 0, 1, 2, cleanupao());
-VARFP(aofloatdepth, 0, 1, 1, initwarning("AO setup", INIT_LOAD, CHANGE_SHADERS));
+VARFP(aofloatdepth, 0, 1, 2, initwarning("AO setup", INIT_LOAD, CHANGE_SHADERS));
 VARFP(aoprec, 0, 1, 1, cleanupao());
 VAR(aodepthformat, 1, 0, 0);
 VARF(aonoise, 0, 5, 8, cleanupao());
@@ -227,11 +228,12 @@ FVARP(aobilateraldepth, 0, 4, 1e3f);
 VARFP(aobilateralupscale, 0, 0, 1, cleanupao());
 VARF(aopackdepth, 0, 1, 1, cleanupao());
 VARFP(aotaps, 1, 5, 12, cleanupao());
+VARF(aoderivnormal, 0, 0, 1, cleanupao());
 VAR(debugao, 0, 0, 1);
 
 void initao()
 {
-    aodepthformat = aofloatdepth && hasTRG && hasTF ? 1 : 0;
+    aodepthformat = aofloatdepth && hasTRG && hasTF ? aofloatdepth : 0;
 }
 
 void viewao()
@@ -280,7 +282,12 @@ void renderao()
     glBindFramebuffer_(GL_FRAMEBUFFER_EXT, aofbo[0]);
     glViewport(0, 0, aow, aoh);
     glActiveTexture_(GL_TEXTURE1_ARB);
-    if(msaasamples) glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, msnormaltex);
+    if(aoderivnormal)
+    {
+        if(msaasamples) glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, msdepthtex);
+        else glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gdepthtex);
+    }
+    else if(msaasamples) glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, msnormaltex);
     else glBindTexture(GL_TEXTURE_RECTANGLE_ARB, gnormaltex);
     glActiveTexture_(GL_TEXTURE2_ARB);
     glBindTexture(GL_TEXTURE_2D, aonoisetex);
@@ -2379,7 +2386,7 @@ void renderlights(float bsx1 = -1, float bsy1 = -1, float bsx2 = 1, float bsy2 =
     GLOBALPARAM(shadowatlasscale, (1.0f/shadowatlaspacker.w, 1.0f/shadowatlaspacker.h));
     if(ao)
     {
-        if((editmode && fullbright) || drawtex)
+        if(tilemask || (editmode && fullbright) || drawtex)
         {
             GLOBALPARAM(aoscale, (0.0f, 0.0f));
             GLOBALPARAM(aoparams, (1.0f, 0.0f, 1.0f, 0.0f));
