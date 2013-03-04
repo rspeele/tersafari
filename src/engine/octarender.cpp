@@ -44,9 +44,9 @@ void genvbo(int type, void *buf, int len, vtxarray **vas, int numva)
 {
     GLuint vbo;
     glGenBuffers_(1, &vbo);
-    GLenum target = type==VBO_VBUF ? GL_ARRAY_BUFFER_ARB : GL_ELEMENT_ARRAY_BUFFER_ARB;
+    GLenum target = type==VBO_VBUF ? GL_ARRAY_BUFFER : GL_ELEMENT_ARRAY_BUFFER;
     glBindBuffer_(target, vbo);
-    glBufferData_(target, len, buf, GL_STATIC_DRAW_ARB);
+    glBufferData_(target, len, buf, GL_STATIC_DRAW);
     glBindBuffer_(target, 0);
 
     vboinfo &vbi = vbos[vbo]; 
@@ -272,11 +272,10 @@ struct vacollect : verthash
             f++; \
         } \
     } while(0)
-#define GENVERTSPOSNORMUV(type, ptr, body) GENVERTS(type, ptr, { f->pos = v.pos; f->norm = v.norm; f->norm.flip(); f->reserved = 0; f->u = v.u; f->v = v.v; body; })
 
     void genverts(void *buf)
     {
-        GENVERTS(vertex, buf, { *f = v; f->norm.flip(); });
+        GENVERTS(vertex, buf, { *f = v; f->norm.flip(); f->tangent.flip(); f->bitangent -= 128; });
     }
 
     void setupdata(vtxarray *va)
@@ -576,8 +575,8 @@ static inline void calctexgen(VSlot &vslot, int dim, vec4 &sgen, vec4 &tgen)
           xs = vslot.rotation>=2 && vslot.rotation<=4 ? -tex->xs : tex->xs,
           ys = (vslot.rotation>=1 && vslot.rotation<=2) || vslot.rotation==5 ? -tex->ys : tex->ys,
           sk = k/xs, tk = k/ys,
-          soff = -((vslot.rotation&5)==1 ? vslot.yoffset : vslot.xoffset)/xs,
-          toff = -((vslot.rotation&5)==1 ? vslot.xoffset : vslot.yoffset)/ys;
+          soff = -((vslot.rotation&5)==1 ? vslot.offset.y : vslot.offset.x)/xs,
+          toff = -((vslot.rotation&5)==1 ? vslot.offset.x : vslot.offset.y)/ys;
     static const int si[] = { 1, 0, 0 }, ti[] = { 2, 2, 1 };
     int sdim = si[dim], tdim = ti[dim];
     sgen = vec4(0, 0, 0, soff); 
@@ -690,7 +689,7 @@ void addcubeverts(VSlot &vslot, int orient, int size, vec *pos, int convex, usho
         if(vslot.refractscale > 0) loopk(numverts) { vc.refractmin.min(pos[k]); vc.refractmax.max(pos[k]); }
     }
 
-    sortkey key(texture, vslot.scrollS || vslot.scrollT ? dim : 3, layer&LAYER_BOTTOM ? layer : LAYER_TOP, envmap, alpha ? (vslot.refractscale > 0 ? ALPHA_REFRACT : (vslot.alphaback ? ALPHA_BACK : ALPHA_FRONT)) : NO_ALPHA);
+    sortkey key(texture, vslot.scroll.iszero() ? 3 : dim, layer&LAYER_BOTTOM ? layer : LAYER_TOP, envmap, alpha ? (vslot.refractscale > 0 ? ALPHA_REFRACT : (vslot.alphaback ? ALPHA_BACK : ALPHA_FRONT)) : NO_ALPHA);
     addtris(key, orient, verts, index, numverts, convex, tj);
 
     if(grassy) 

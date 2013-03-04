@@ -440,16 +440,21 @@ struct captureclientmode : clientmode
             }
             else
             {
-                if(!blips) glBegin(GL_QUADS);
+                if(!blips) 
+                {
+                    varray::defvertex(2);
+                    varray::deftexcoord0();
+                    varray::begin(GL_QUADS);
+                }
                 float x = 0.5f*(dir.x*fw/blipsize - fw), y = 0.5f*(dir.y*fh/blipsize - fh);
-                glTexCoord2f(0.0f, 0.0f); glVertex2f(x,    y);
-                glTexCoord2f(1.0f, 0.0f); glVertex2f(x+fw, y);
-                glTexCoord2f(1.0f, 1.0f); glVertex2f(x+fw, y+fh);
-                glTexCoord2f(0.0f, 1.0f); glVertex2f(x,    y+fh);
+                varray::attribf(x,    y);    varray::attribf(0, 0);
+                varray::attribf(x+fw, y);    varray::attribf(1, 0);
+                varray::attribf(x+fw, y+fh); varray::attribf(1, 1);
+                varray::attribf(x,    y+fh); varray::attribf(0, 1);
             }
             blips++;
         }
-        if(blips && !basenumbers) glEnd();
+        if(blips && !basenumbers) varray::end();
     }
 
     int respawnwait(fpsent *d)
@@ -467,22 +472,23 @@ struct captureclientmode : clientmode
     {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         int s = 1800/4, x = 1800*w/h - s - s/10, y = s/10;
-        glColor4f(1, 1, 1, minimapalpha);
+        varray::colorf(1, 1, 1, minimapalpha);
         if(minimapalpha >= 1) glDisable(GL_BLEND);
         bindminimap();
         drawminimap(d, x, y, s);
         if(minimapalpha >= 1) glEnable(GL_BLEND);
-        glColor3f(1, 1, 1);
+        varray::colorf(1, 1, 1);
         float margin = 0.04f, roffset = s*margin, rsize = s + 2*roffset;
         settexture("packages/hud/radar.png", 3);
         drawradar(x - roffset, y - roffset, rsize);
         #if 0
         settexture("packages/hud/compass.png", 3);
-        glPushMatrix();
-        glTranslatef(x - roffset + 0.5f*rsize, y - roffset + 0.5f*rsize, 0);
-        glRotatef(camera1->yaw + 180, 0, 0, -1);
+        pushhudmatrix();
+        hudmatrix.translate(x - roffset + 0.5f*rsize, y - roffset + 0.5f*rsize, 0);
+        hudmatrix.rotate_around_z((camera1->yaw + 180)*-RAD);
+        flushhudmatrix();
         drawradar(-0.5f*rsize, -0.5f*rsize, rsize);
-        glPopMatrix();
+        pophudmatrix();
         #endif
         bool showenemies = lastmillis%1000 >= 500;
         int fw = 1, fh = 1;
@@ -493,10 +499,11 @@ struct captureclientmode : clientmode
             text_bounds(" ", fw, fh);
         }
         else settexture("packages/hud/blip_blue.png", 3);
-        glPushMatrix();
-        glTranslatef(x + 0.5f*s, y + 0.5f*s, 0);
+        pushhudmatrix();
+        hudmatrix.translate(x + 0.5f*s, y + 0.5f*s, 0);
         float blipsize = basenumbers ? 0.1f : 0.05f;
-        glScalef((s*blipsize)/fw, (s*blipsize)/fh, 1.0f);
+        hudmatrix.scale((s*blipsize)/fw, (s*blipsize)/fh, 1.0f);
+        flushhudmatrix();
         drawblips(d, blipsize, fw, fh, 1, showenemies);
         if(basenumbers) setfont("digit_grey");
         else settexture("packages/hud/blip_grey.png", 3);
@@ -505,7 +512,7 @@ struct captureclientmode : clientmode
         else settexture("packages/hud/blip_red.png", 3);
         drawblips(d, blipsize, fw, fh, -1, showenemies);
         if(showenemies) drawblips(d, blipsize, fw, fh, -2);
-        glPopMatrix();
+        pophudmatrix();
         if(basenumbers) popfont();
         drawteammates(d, x, y, s);
         if(d->state == CS_DEAD)
@@ -513,11 +520,12 @@ struct captureclientmode : clientmode
             int wait = respawnwait(d);
             if(wait>=0)
             {
-                glPushMatrix();
-                glScalef(2, 2, 1);
+                pushhudmatrix();
+                hudmatrix.scale(2, 2, 1);
+                flushhudmatrix();
                 bool flash = wait>0 && d==player1 && lastspawnattempt>=d->lastpain && lastmillis < lastspawnattempt+100;
                 draw_textf("%s%d", (x+s/2)/2-(wait>=10 ? 28 : 16), (y+s/2)/2-32, flash ? "\f3" : "", wait);
-                glPopMatrix();
+                pophudmatrix();
             }
         }
     }

@@ -896,13 +896,15 @@ namespace game
     void drawicon(int icon, float x, float y, float sz)
     {
         settexture("packages/hud/items.png");
-        glBegin(GL_TRIANGLE_STRIP);
         float tsz = 0.25f, tx = tsz*(icon%4), ty = tsz*(icon/4);
-        glTexCoord2f(tx,     ty);     glVertex2f(x,    y);
-        glTexCoord2f(tx+tsz, ty);     glVertex2f(x+sz, y);
-        glTexCoord2f(tx,     ty+tsz); glVertex2f(x,    y+sz);
-        glTexCoord2f(tx+tsz, ty+tsz); glVertex2f(x+sz, y+sz);
-        glEnd();
+        varray::defvertex(2);
+        varray::deftexcoord0();
+        varray::begin(GL_TRIANGLE_STRIP);
+        varray::attribf(x,    y);    varray::attribf(tx,     ty);
+        varray::attribf(x+sz, y);    varray::attribf(tx+tsz, ty);
+        varray::attribf(x,    y+sz); varray::attribf(tx,     ty+tsz);
+        varray::attribf(x+sz, y+sz); varray::attribf(tx+tsz, ty+tsz);
+        varray::end();
     }
 
     float abovegameplayhud(int w, int h)
@@ -941,8 +943,9 @@ namespace game
     void drawammohud(fpsent *d)
     {
         float x = HICON_X + 2*HICON_STEP, y = HICON_Y, sz = HICON_SIZE;
-        glPushMatrix();
-        glScalef(1/3.2f, 1/3.2f, 1);
+        pushhudmatrix();
+        hudmatrix.scale(1/3.2f, 1/3.2f, 1);
+        flushhudmatrix();
         float xup = (x+sz)*3.2f, yup = y*3.2f + 0.1f*sz;
         loopi(3)
         {
@@ -975,13 +978,14 @@ namespace game
             xcycle -= sz;
             drawicon(HICON_FIST+gun, xcycle, ycycle, sz);
         }
-        glPopMatrix();
+        pophudmatrix();
     }
 
     void drawhudicons(fpsent *d)
     {
-        glPushMatrix();
-        glScalef(2, 2, 1);
+        pushhudmatrix();
+        hudmatrix.scale(2, 2, 1);
+        flushhudmatrix();
 
         draw_textf("%d", (HICON_X + HICON_SIZE + HICON_SPACE)/2, HICON_TEXTY/2, d->state==CS_DEAD ? 0 : d->health);
         if(d->state!=CS_DEAD)
@@ -992,7 +996,7 @@ namespace game
             else draw_textf("%d", ammox, ammoy, d->ammo[d->gunselect]);
         }
 
-        glPopMatrix();
+        pophudmatrix();
 
         drawicon(HICON_HEALTH, HICON_X, HICON_Y);
         if(d->state!=CS_DEAD)
@@ -1012,8 +1016,9 @@ namespace game
             hudstate::scrh = h;
             hudstate::draw();
         }
-        glPushMatrix();
-        glScalef(h/1800.0f, h/1800.0f, 1);
+        pushhudmatrix();
+        hudmatrix.scale(h/1800.0f, h/1800.0f, 1);
+        flushhudmatrix();
 
         int pw, ph, tw, th, fw, fh;
         if(spectating(player1))
@@ -1067,7 +1072,7 @@ namespace game
             if(cmode) cmode->drawhud(d, w, h);
         }
 
-        glPopMatrix();
+        pophudmatrix();
     }
 
     int clipconsole(int w, int h)

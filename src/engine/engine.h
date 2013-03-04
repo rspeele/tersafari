@@ -9,10 +9,8 @@
 #include "octa.h"
 #include "light.h"
 #include "bih.h"
-#include "glexts.h"
 #include "texture.h"
 #include "model.h"
-#include "varray.h"
 
 extern dynent *player;
 extern physent *camera1;                // special ent that acts as camera, same object as player1 in FPS mode
@@ -58,7 +56,7 @@ struct font
 extern font *curfont;
 
 // texture
-extern int hwtexsize, hwcubetexsize, hwmaxaniso, maxtexsize;
+extern int hwtexsize, hwcubetexsize, hwmaxaniso, maxtexsize, hwtexunits, hwvtexunits;
 
 extern Texture *textureload(const char *name, int clamp = 0, bool mipit = true, bool msg = true);
 extern int texalign(const void *data, int w, int bpp);
@@ -70,7 +68,7 @@ extern void drawcubemap(int size, const vec &o, float yaw, float pitch, const cu
 extern void loadshaders();
 extern void setuptexparameters(int tnum, const void *pixels, int clamp, int filter, GLenum format = GL_RGB, GLenum target = GL_TEXTURE_2D);
 extern void createtexture(int tnum, int w, int h, const void *pixels, int clamp, int filter, GLenum component = GL_RGB, GLenum target = GL_TEXTURE_2D, int pw = 0, int ph = 0, int pitch = 0, bool resize = true, GLenum format = GL_FALSE);
-extern void create3dtexture(int tnum, int w, int h, int d, const void *pixels, int clamp, int filter, GLenum component = GL_RGB, GLenum target = GL_TEXTURE_3D_EXT);
+extern void create3dtexture(int tnum, int w, int h, int d, const void *pixels, int clamp, int filter, GLenum component = GL_RGB, GLenum target = GL_TEXTURE_3D);
 extern void blurtexture(int n, int bpp, int w, int h, uchar *dst, const uchar *src, int margin = 0);
 extern void blurnormals(int n, int w, int h, bvec *dst, const bvec *src, int margin = 0);
 extern GLuint setuppostfx(int w, int h, GLuint outfbo = 0);
@@ -108,7 +106,7 @@ static inline bool pvsoccluded(const ivec &bborigin, int size)
 }
 
 // rendergl
-extern bool hasVBO, hasDRE, hasOQ, hasTR, hasT3D, hasFBO, hasAFBO, hasDS, hasTF, hasCBF, hasBE, hasBC, hasCM, hasNP2, hasTC, hasS3TC, hasFXT1, hasMT, hasAF, hasMDA, hasGLSL, hasGM, hasNVFB, hasSGIDT, hasSGISH, hasDT, hasSH, hasNVPCF, hasPBO, hasFBB, hasFBMS, hasTMS, hasMSS, hasFBMSBS, hasNVFBMSC, hasNVTMS, hasUBO, hasBUE, hasMBR, hasDB, hasTG, hasT4, hasTQ, hasPF, hasTRG, hasDBT, hasDC, hasDBGO, hasGPU4, hasGPU5;
+extern bool hasVAO, hasTR, hasTSW, hasFBO, hasAFBO, hasDS, hasTF, hasCBF, hasS3TC, hasFXT1, hasAF, hasFBB, hasFBMS, hasTMS, hasMSS, hasFBMSBS, hasNVFBMSC, hasNVTMS, hasUBO, hasMBR, hasDB, hasTG, hasT4, hasTQ, hasPF, hasTRG, hasDBT, hasDC, hasDBGO, hasGPU4, hasGPU5;
 extern int glversion, glslversion;
 
 enum { DRAWTEX_NONE = 0, DRAWTEX_ENVMAP, DRAWTEX_MINIMAP, DRAWTEX_MODELPREVIEW };
@@ -122,8 +120,8 @@ extern int hdr;
 extern bool hdrfloat;
 extern float ldrscale, ldrscaleb;
 extern int drawtex;
-extern const glmatrixf viewmatrix;
-extern glmatrixf mvmatrix, projmatrix, mvpmatrix, invmvmatrix, invmvpmatrix, invprojmatrix;
+extern const glmatrix viewmatrix, invviewmatrix;
+extern glmatrix cammatrix, projmatrix, camprojmatrix, invcammatrix, invcamprojmatrix, invprojmatrix;
 extern int fog;
 extern bvec fogcolor;
 extern vec curfogcolor;
@@ -146,12 +144,15 @@ extern bool calcbbscissor(const ivec &bbmin, const ivec &bbmax, float &sx1, floa
 extern bool calcspotscissor(const vec &origin, float radius, const vec &dir, int spot, const vec &spotx, const vec &spoty, float &sx1, float &sy1, float &sx2, float &sy2, float &sz1, float &sz2);
 extern int pushscissor(float sx1, float sy1, float sx2, float sy2);
 extern void popscissor();
+extern void screenquad();
 extern void screenquad(float sw, float sh);
+extern void screenquadflipped(float sw, float sh);
 extern void screenquad(float sw, float sh, float sw2, float sh2);
 extern void screenquadoffset(float x, float y, float w, float h);
 extern void screenquadoffset(float x, float y, float w, float h, float x2, float y2, float w2, float h2);
+extern void hudquad(float x, float y, float w, float h, float tx = 0, float ty = 0, float tw = 1, float th = 1);
+extern void debugquad(float x, float y, float w, float h, float tx = 0, float ty = 0, float tw = 1, float th = 1);
 extern void recomputecamera();
-extern void findorientation();
 extern float calcfrustumboundsphere(float nearplane, float farplane,  const vec &pos, const vec &view, vec &center);
 extern void setfogcolor(const vec &v);
 extern void zerofogcolor();
@@ -275,6 +276,7 @@ extern int shadowmapping;
 extern vec shadoworigin, shadowdir;
 extern float shadowradius, shadowbias;
 extern int shadowside, shadowspot;
+extern glmatrix shadowmatrix;
 
 extern void resetlights();
 extern void collectlights();
@@ -315,7 +317,7 @@ static inline bool bbinsidespot(const vec &origin, const vec &dir, int spot, con
     return sphereinsidespot(dir, spot, center.sub(origin), radius.magnitude());
 }
 
-extern glmatrixf worldmatrix, screenmatrix;
+extern glmatrix worldmatrix, screenmatrix;
 
 extern int gw, gh, gdepthformat, gstencil, gdepthstencil;
 extern GLuint gdepthtex, gcolortex, gnormaltex, gglowtex, gdepthrb, gstencilrb;
@@ -346,12 +348,13 @@ extern bool debuglights();
 extern void cleanuplights();
 
 // aa
+extern glmatrix nojittermatrix, aamaskmatrix;
 
 extern void setupaa(int w, int h);
-extern void jitteraa();
+extern void jitteraa(bool init = true);
 extern bool maskedaa();
 extern bool multisampledaa();
-extern void setaavelocityparams(GLenum tmu = GL_TEXTURE0_ARB);
+extern void setaavelocityparams(GLenum tmu = GL_TEXTURE0);
 extern void setaamask(bool val);
 extern void doaa(GLuint outfbo, void (*resolve)(GLuint, int));
 extern bool debugaa();
@@ -416,13 +419,8 @@ extern void resetqueries();
 extern int getnumqueries();
 extern void drawbb(const ivec &bo, const ivec &br, const vec &camera = camera1->o);
 
-#define startquery(query) do { glBeginQuery_(GL_SAMPLES_PASSED_ARB, ((occludequery *)(query))->id); } while(0)
-#define endquery(query) \
-    do { \
-        glEndQuery_(GL_SAMPLES_PASSED_ARB); \
-        extern int ati_oq_bug; \
-        if(ati_oq_bug) glFlush(); \
-    } while(0)
+#define startquery(query) do { glBeginQuery_(GL_SAMPLES_PASSED, ((occludequery *)(query))->id); } while(0)
+#define endquery(query) do { glEndQuery_(GL_SAMPLES_PASSED); } while(0)
 
 struct shadowmesh;
 extern void clearshadowmeshes();
@@ -639,8 +637,10 @@ extern mapmodelinfo *getmminfo(int i);
 extern void resetmodelbatches();
 extern void startmodelquery(occludequery *query);
 extern void endmodelquery();
-extern void rendermodelbatches(bool dynmodel = true);
+extern void rendershadowmodelbatches(bool dynmodel = true);
 extern void shadowmaskbatchedmodels(bool dynshadow = true);
+extern void rendermapmodelbatches();
+extern void rendermodelbatches();
 extern void rendermapmodel(int idx, int anim, const vec &o, float yaw = 0, float pitch = 0, int flags = MDL_CULL_VFC | MDL_CULL_DIST, int basetime = 0, float size = 1);
 extern void clearbatchedmapmodels();
 extern void preloadusedmapmodels(bool msg = false, bool bih = false);

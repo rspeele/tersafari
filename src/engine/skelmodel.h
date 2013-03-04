@@ -460,8 +460,7 @@ struct skelmodel : animmodel
 
         void render(const animstate *as, skin &s, vbocacheentry &vc)
         {
-            if(hasDRE) glDrawRangeElements_(GL_TRIANGLES, minvert, maxvert, elen, GL_UNSIGNED_SHORT, &((skelmeshgroup *)group)->edata[eoffset]);
-            else glDrawElements(GL_TRIANGLES, elen, GL_UNSIGNED_SHORT, &((skelmeshgroup *)group)->edata[eoffset]);
+            glDrawRangeElements_(GL_TRIANGLES, minvert, maxvert, elen, GL_UNSIGNED_SHORT, &((skelmeshgroup *)group)->edata[eoffset]);
             glde++;
             xtravertsva += numverts;
         }
@@ -1029,7 +1028,7 @@ struct skelmodel : animmodel
             loopv(ragdoll->verts) \
             { \
                 ragdolldata::vert &dv = d.verts[i]; \
-                matrixstack[matrixpos].transform(vec(dv.pos).add(p->translate).mul(p->model->scale), dv.pos); \
+                matrixstack[matrixpos].transform(vec(dv.pos).mul(p->model->scale), dv.pos); \
             } \
             loopv(ragdoll->reljoints) \
             { \
@@ -1059,7 +1058,7 @@ struct skelmodel : animmodel
 
         #define GENRAGDOLLBONES(outbody, relbody) \
             sc.nextversion(); \
-            vec trans = vec(d.center).div(p->model->scale).add(p->translate); \
+            vec trans = vec(d.center).div(p->model->scale).add(p->model->translate); \
             loopv(ragdoll->joints) \
             { \
                 const ragdollskel::joint &j = ragdoll->joints[i]; \
@@ -1108,7 +1107,6 @@ struct skelmodel : animmodel
         {
             matrix3x4 t;
             t.mul(bones[tags[i].bone].base, tags[i].matrix);
-            t.translate(vec(p->translate).mul(p->model->scale));
             n.mul(m, t);
         }
 
@@ -1127,9 +1125,7 @@ struct skelmodel : animmodel
                 }
                 float resize = p->model->scale * sizescale;
                 l.matrix = m;
-                l.matrix[12] = (l.matrix[12] + p->translate.x) * resize;
-                l.matrix[13] = (l.matrix[13] + p->translate.y) * resize;
-                l.matrix[14] = (l.matrix[14] + p->translate.z) * resize;
+                l.matrix.d.mul3(resize);
             }
         }
 
@@ -1378,14 +1374,14 @@ struct skelmodel : animmodel
                     loopv(blendcombos) blendcombos[i].interpindex = -1;
                 }
 
-                glBindBuffer_(GL_ARRAY_BUFFER_ARB, vc.vbuf);
+                glBindBuffer_(GL_ARRAY_BUFFER, vc.vbuf);
                 #define GENVBO(type, args) \
                     do \
                     { \
                         vertsize = sizeof(type); \
                         vector<type> vverts; \
                         loopv(meshes) vlen += ((skelmesh *)meshes[i])->genvbo args; \
-                        glBufferData_(GL_ARRAY_BUFFER_ARB, vverts.length()*sizeof(type), vverts.getbuf(), GL_STATIC_DRAW_ARB); \
+                        glBufferData_(GL_ARRAY_BUFFER, vverts.length()*sizeof(type), vverts.getbuf(), GL_STATIC_DRAW); \
                     } while(0)
                 #define GENVBOANIM(type) GENVBO(type, (idxs, vlen, vverts))
                 #define GENVBOSTAT(type) GENVBO(type, (idxs, vlen, vverts, htdata, htlen))
@@ -1410,13 +1406,13 @@ struct skelmodel : animmodel
                 #undef GENVBO
                 #undef GENVBOANIM
                 #undef GENVBOSTAT
-                glBindBuffer_(GL_ARRAY_BUFFER_ARB, 0);
+                glBindBuffer_(GL_ARRAY_BUFFER, 0);
             }
 
             glGenBuffers_(1, &ebuf);
-            glBindBuffer_(GL_ELEMENT_ARRAY_BUFFER_ARB, ebuf);
-            glBufferData_(GL_ELEMENT_ARRAY_BUFFER_ARB, idxs.length()*sizeof(ushort), idxs.getbuf(), GL_STATIC_DRAW_ARB);
-            glBindBuffer_(GL_ELEMENT_ARRAY_BUFFER_ARB, 0);
+            glBindBuffer_(GL_ELEMENT_ARRAY_BUFFER, ebuf);
+            glBufferData_(GL_ELEMENT_ARRAY_BUFFER, idxs.length()*sizeof(ushort), idxs.getbuf(), GL_STATIC_DRAW);
+            glBindBuffer_(GL_ELEMENT_ARRAY_BUFFER, 0);
         }
 
         void bindvbo(const animstate *as, part *p, vbocacheentry &vc, skelcacheentry *sc = NULL, blendcacheentry *bc = NULL)
@@ -1677,8 +1673,8 @@ struct skelmodel : animmodel
                         if(skel->usematskel) m.interpverts(sc.mdata, bc ? bc->mdata : NULL, norms, tangents, vdata + m.voffset*vertsize, p->skins[i]);
                         else m.interpverts(sc.bdata, bc ? bc->bdata : NULL, norms, tangents, vdata + m.voffset*vertsize, p->skins[i]);
                     }
-                    glBindBuffer_(GL_ARRAY_BUFFER_ARB, vc.vbuf);
-                    glBufferData_(GL_ARRAY_BUFFER_ARB, vlen*vertsize, vdata, GL_STREAM_DRAW_ARB);
+                    glBindBuffer_(GL_ARRAY_BUFFER, vc.vbuf);
+                    glBufferData_(GL_ARRAY_BUFFER, vlen*vertsize, vdata, GL_STREAM_DRAW);
                 }
 
                 bindvbo(as, p, vc, &sc, bc);

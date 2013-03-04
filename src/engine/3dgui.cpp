@@ -55,9 +55,11 @@ struct gui : g3d_gui
 
     static int ty, tx, tpos, *tcurrent, tcolor; //tracking tab size and position since uses different layout method...
 
-    void allowautotab(bool on)
+    bool allowautotab(bool on)
     {
+        bool oldval = shouldautotab;
         shouldautotab = on;
+        return oldval;
     }
 
     void autotab() 
@@ -270,7 +272,12 @@ struct gui : g3d_gui
         }
     }
 
-    void mergehits(bool on) { shouldmergehits = on; }
+    bool mergehits(bool on) 
+    { 
+        bool oldval = shouldmergehits;
+        shouldmergehits = on; 
+        return oldval;
+    }
 
     bool ishit(int w, int h, int x = curx, int y = cury)
     {
@@ -309,36 +316,34 @@ struct gui : g3d_gui
             float xs = size, ys = size, xi = curx, yi = cury;
             if(overlaid && hit && actionon)
             {
-                glDisable(GL_TEXTURE_2D);
-                notextureshader->set();
-                glColor4f(0, 0, 0, 0.75f);
+                hudnotextureshader->set();
+                varray::colorf(0, 0, 0, 0.75f);
                 rect_(xi+SHADOW, yi+SHADOW, xs, ys, -1);
-                glEnable(GL_TEXTURE_2D);
-                defaultshader->set();
+                hudshader->set();
             }
             int x1 = int(floor(screen->w*(xi*scale.x+origin.x))), y1 = int(floor(screen->h*(1 - ((yi+ys)*scale.y+origin.y)))),
                 x2 = int(ceil(screen->w*((xi+xs)*scale.x+origin.x))), y2 = int(ceil(screen->h*(1 - (yi*scale.y+origin.y))));
             glDisable(GL_BLEND);
+            varray::disable();
             modelpreview::start(x1, y1, x2-x1, y2-y1, overlaid);
             game::renderplayerpreview(model, team, weap);
             modelpreview::end();
+            hudshader->set();
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
             glEnable(GL_BLEND);
             if(overlaid)
             {
                 if(hit)
                 {
-                    glDisable(GL_TEXTURE_2D);
-                    notextureshader->set();
+                    hudnotextureshader->set();
                     glBlendFunc(GL_ZERO, GL_SRC_COLOR);
-                    glColor3f(1, 0.5f, 0.5f);
+                    varray::colorf(1, 0.5f, 0.5f);
                     rect_(xi, yi, xs, ys, -1);
                     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-                    glEnable(GL_TEXTURE_2D);
-                    defaultshader->set();
+                    hudshader->set();
                 }
                 if(!overlaytex) overlaytex = textureload("data/guioverlay.png", 3);
-                glColor3f(1, 1, 1);
+                varray::colorf(1, 1, 1);
                 glBindTexture(GL_TEXTURE_2D, overlaytex->id);
                 rect_(xi, yi, xs, ys, 0);
             }
@@ -357,16 +362,15 @@ struct gui : g3d_gui
             float xs = size, ys = size, xi = curx, yi = cury;
             if(overlaid && hit && actionon)
             {
-                glDisable(GL_TEXTURE_2D);
-                notextureshader->set();
-                glColor4f(0, 0, 0, 0.75f);
+                hudnotextureshader->set();
+                varray::colorf(0, 0, 0, 0.75f);
                 rect_(xi+SHADOW, yi+SHADOW, xs, ys, -1);
-                glEnable(GL_TEXTURE_2D);
-                defaultshader->set();
+                hudshader->set();
             }
             int x1 = int(floor(screen->w*(xi*scale.x+origin.x))), y1 = int(floor(screen->h*(1 - ((yi+ys)*scale.y+origin.y)))),
                 x2 = int(ceil(screen->w*((xi+xs)*scale.x+origin.x))), y2 = int(ceil(screen->h*(1 - (yi*scale.y+origin.y))));
             glDisable(GL_BLEND);
+            varray::disable();
             modelpreview::start(x1, y1, x2-x1, y2-y1, overlaid);
             model *m = loadmodel(name);
             if(m)
@@ -385,17 +389,15 @@ struct gui : g3d_gui
             {
                 if(hit)
                 {
-                    glDisable(GL_TEXTURE_2D);
-                    notextureshader->set();
+                    hudnotextureshader->set();
                     glBlendFunc(GL_ZERO, GL_SRC_COLOR);
-                    glColor3f(1, 0.5f, 0.5f);
+                    varray::colorf(1, 0.5f, 0.5f);
                     rect_(xi, yi, xs, ys, -1);
                     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-                    glEnable(GL_TEXTURE_2D);
-                    defaultshader->set();
+                    hudshader->set();
                 }
                 if(!overlaytex) overlaytex = textureload("data/guioverlay.png", 3);
-                glColor3f(1, 1, 1);
+                varray::colorf(1, 1, 1);
                 glBindTexture(GL_TEXTURE_2D, overlaytex->id);
                 rect_(xi, yi, xs, ys, 0);
             }
@@ -508,13 +510,13 @@ struct gui : g3d_gui
             
             e->draw(curx+FONTW/2, cury, color, hit && editing);
             
-            notextureshader->set();
+            hudnotextureshader->set();
             glDisable(GL_BLEND);
-            if(editing) glColor3f(1, 0, 0);
-            else glColor3ub(color>>16, (color>>8)&0xFF, color&0xFF);
+            if(editing) varray::colorf(1, 0, 0);
+            else varray::color(vec::hexcolor(color));
             rect_(curx, cury, w, h, -1, true);
             glEnable(GL_BLEND);
-            defaultshader->set();
+            hudshader->set();
         }
         layout(w, h);
         
@@ -535,26 +537,27 @@ struct gui : g3d_gui
 
     void rect_(float x, float y, float w, float h, int usetc = -1, bool lines = false) 
     {
-        glBegin(lines ? GL_LINE_LOOP : GL_TRIANGLE_STRIP);
-        static const GLfloat tc[4][2] = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
-        if(usetc>=0) glTexCoord2fv(tc[usetc]); 
-        glVertex2f(x, y);
-        if(usetc>=0) glTexCoord2fv(tc[(usetc+1)%4]);
-        glVertex2f(x + w, y);
+        varray::defvertex(2);
+        if(usetc >= 0) varray::deftexcoord0();
+        varray::begin(lines ? GL_LINE_LOOP : GL_TRIANGLE_STRIP);
+        static const vec2 tc[4] = { vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1) };
+        varray::attribf(x, y);
+        if(usetc>=0) varray::attrib(tc[usetc]); 
+        varray::attribf(x + w, y);
+        if(usetc>=0) varray::attrib(tc[(usetc+1)%4]);
         if(lines)
         {
-            if(usetc>=0) glTexCoord2fv(tc[(usetc+2)%4]);
-            glVertex2f(x + w, y + h);
+            varray::attribf(x + w, y + h);
+            if(usetc>=0) varray::attrib(tc[(usetc+2)%4]);
         }
-        if(usetc>=0) glTexCoord2fv(tc[(usetc+3)%4]);
-        glVertex2f(x, y + h);
+        varray::attribf(x, y + h);
+        if(usetc>=0) varray::attrib(tc[(usetc+3)%4]);
         if(!lines)
         {
-            if(usetc>=0) glTexCoord2fv(tc[(usetc+2)%4]);
-            glVertex2f(x + w, y + h);
+            varray::attribf(x + w, y + h);
+            if(usetc>=0) varray::attrib(tc[(usetc+2)%4]);
         }
-        glEnd();
-        xtraverts += 4;
+        xtraverts += varray::end();
         
     }
 
@@ -567,8 +570,8 @@ struct gui : g3d_gui
     void background(int color, int inheritw, int inherith)
     {
         if(layoutpass) return;
-        notextureshader->set();
-        glColor4ub(color>>16, (color>>8)&0xFF, color&0xFF, 0x80);
+        hudnotextureshader->set();
+        varray::color(vec::hexcolor(color), 0.5f);
         int w = xsize, h = ysize;
         if(inheritw>0) 
         {
@@ -587,7 +590,7 @@ struct gui : g3d_gui
             h = p.springs > 0 && !((curdepth-parentdepth)&1) ? lists[p.parent].h : p.h;
         }
         rect_(curx, cury, w, h);
-        defaultshader->set();
+        hudshader->set();
     }
 
     void icon_(Texture *t, bool overlaid, int x, int y, int size, bool hit)
@@ -600,17 +603,17 @@ struct gui : g3d_gui
         glBindTexture(GL_TEXTURE_2D, t->id);
         if(hit && actionon)
         {
-            glColor4f(0, 0, 0, 0.75f);
+            varray::colorf(0, 0, 0, 0.75f);
             rect_(x+SHADOW, y+SHADOW, xs, ys, 0);
         }
-        glColor3fv(color.v);
+        varray::color(color);
         rect_(x, y, xs, ys, 0);
 
         if(overlaid)
         {
             if(!overlaytex) overlaytex = textureload("data/guioverlay.png", 3);
             glBindTexture(GL_TEXTURE_2D, overlaytex->id);
-            glColor3f(1, 1, 1);
+            varray::colorf(1, 1, 1);
             rect_(x, y, xs, ys, 0);
         }
     }        
@@ -638,63 +641,63 @@ struct gui : g3d_gui
         float xt = min(1.0f, t->xs/(float)t->ys), yt = min(1.0f, t->ys/(float)t->xs), xs = size, ys = size;
         if(hit && actionon) 
         {
-            notextureshader->set();
-            glColor4f(0, 0, 0, 0.75f);
+            hudnotextureshader->set();
+            varray::colorf(0, 0, 0, 0.75f);
             rect_(x+SHADOW, y+SHADOW, xs, ys);
-            defaultshader->set();	
+            hudshader->set();	
         }
-        SETSHADER(rgbonly);
+        SETSHADER(hudrgb);
         const vec &color = hit ? vec(1, 0.5f, 0.5f) : vec(1, 1, 1);
-        float tc[4][2] = { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 0, 1 } };
-        int xoff = vslot.xoffset, yoff = vslot.yoffset;
+        vec2 tc[4] = { vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1) };
+        int xoff = vslot.offset.x, yoff = vslot.offset.y;
         if(vslot.rotation)
         {
-            if((vslot.rotation&5) == 1) { swap(xoff, yoff); loopk(4) swap(tc[k][0], tc[k][1]); }
-            if(vslot.rotation >= 2 && vslot.rotation <= 4) { xoff *= -1; loopk(4) tc[k][0] *= -1; }
-            if(vslot.rotation <= 2 || vslot.rotation == 5) { yoff *= -1; loopk(4) tc[k][1] *= -1; }
+            if((vslot.rotation&5) == 1) { swap(xoff, yoff); loopk(4) swap(tc[k].x, tc[k].y); }
+            if(vslot.rotation >= 2 && vslot.rotation <= 4) { xoff *= -1; loopk(4) tc[k].x *= -1; }
+            if(vslot.rotation <= 2 || vslot.rotation == 5) { yoff *= -1; loopk(4) tc[k].y *= -1; }
         }
-        loopk(4) { tc[k][0] = tc[k][0]/xt - float(xoff)/t->xs; tc[k][1] = tc[k][1]/yt - float(yoff)/t->ys; }
-        if(slot.loaded) glColor3f(color.x*vslot.colorscale.x, color.y*vslot.colorscale.y, color.z*vslot.colorscale.z);
-        else glColor3fv(color.v);
+        loopk(4) { tc[k].x = tc[k].x/xt - float(xoff)/t->xs; tc[k].y = tc[k].y/yt - float(yoff)/t->ys; }
+        varray::color(slot.loaded ? vec(color).mul(vslot.colorscale) : color);
         glBindTexture(GL_TEXTURE_2D, t->id);
-        glBegin(GL_TRIANGLE_STRIP);
-        glTexCoord2fv(tc[0]); glVertex2f(x,    y);
-        glTexCoord2fv(tc[1]); glVertex2f(x+xs, y);
-        glTexCoord2fv(tc[3]); glVertex2f(x,    y+ys);
-        glTexCoord2fv(tc[2]); glVertex2f(x+xs, y+ys);
-        glEnd();
+        varray::defvertex(2);
+        varray::deftexcoord0();
+        varray::begin(GL_TRIANGLE_STRIP);
+        varray::attribf(x,    y);    varray::attrib(tc[0]);
+        varray::attribf(x+xs, y);    varray::attrib(tc[1]);
+        varray::attribf(x,    y+ys); varray::attrib(tc[3]);
+        varray::attribf(x+xs, y+ys); varray::attrib(tc[2]);
+        varray::end();
         if(glowtex)
         {
             glBlendFunc(GL_SRC_ALPHA, GL_ONE);
             glBindTexture(GL_TEXTURE_2D, glowtex->id);
-            if(hit || overlaid) glColor3f(color.x*vslot.glowcolor.x, color.y*vslot.glowcolor.y, color.z*vslot.glowcolor.z);
-            else glColor3fv(vslot.glowcolor.v);
-            glBegin(GL_TRIANGLE_STRIP);
-            glTexCoord2fv(tc[0]); glVertex2f(x,    y);
-            glTexCoord2fv(tc[1]); glVertex2f(x+xs, y);
-            glTexCoord2fv(tc[3]); glVertex2f(x,    y+ys);
-            glTexCoord2fv(tc[2]); glVertex2f(x+xs, y+ys);
-            glEnd();
+            varray::color(hit || overlaid ? vec(color).mul(vslot.glowcolor) : vslot.glowcolor);
+            varray::begin(GL_TRIANGLE_STRIP);
+            varray::attribf(x,    y);    varray::attrib(tc[0]);
+            varray::attribf(x+xs, y);    varray::attrib(tc[1]);
+            varray::attribf(x,    y+ys); varray::attrib(tc[3]);
+            varray::attribf(x+xs, y+ys); varray::attrib(tc[2]);
+            varray::end();
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         }
         if(layertex)
         {
             glBindTexture(GL_TEXTURE_2D, layertex->id);
-            glColor3f(color.x*layer->colorscale.x, color.y*layer->colorscale.y, color.z*layer->colorscale.z);
-            glBegin(GL_TRIANGLE_STRIP);
-            glTexCoord2fv(tc[0]); glVertex2f(x+xs/2, y+ys/2);
-            glTexCoord2fv(tc[1]); glVertex2f(x+xs,   y+ys/2);
-            glTexCoord2fv(tc[3]); glVertex2f(x+xs/2, y+ys);
-            glTexCoord2fv(tc[2]); glVertex2f(x+xs,   y+ys);
-            glEnd();
+            varray::color(vec(color).mul(layer->colorscale));
+            varray::begin(GL_TRIANGLE_STRIP);
+            varray::attribf(x+xs/2, y+ys/2); varray::attrib(tc[0]);
+            varray::attribf(x+xs,   y+ys/2); varray::attrib(tc[1]);
+            varray::attribf(x+xs/2, y+ys);   varray::attrib(tc[3]);
+            varray::attribf(x+xs,   y+ys);   varray::attrib(tc[2]);
+            varray::end();
         }
             
-        defaultshader->set();
+        hudshader->set();
         if(overlaid) 
         {
             if(!overlaytex) overlaytex = textureload("data/guioverlay.png", 3);
             glBindTexture(GL_TEXTURE_2D, overlaytex->id);
-            glColor3f(1, 1, 1);
+            varray::colorf(1, 1, 1);
             rect_(x, y, xs, ys, 0);
         }
     }
@@ -707,13 +710,13 @@ struct gui : g3d_gui
             glBindTexture(GL_TEXTURE_2D, slidertex->id);
             if(percent < 0.99f) 
             {
-                glColor4f(1, 1, 1, 0.375f);
+                varray::colorf(1, 1, 1, 0.375f);
                 if(ishorizontal()) 
                     rect_(curx + FONTH/2 - size/2, cury, size, ysize, 0);
                 else
                     rect_(curx, cury + FONTH/2 - size/2, xsize, size, 1);
             }
-            glColor3f(1, 1, 1);
+            varray::colorf(1, 1, 1);
             if(ishorizontal()) 
                 rect_(curx + FONTH/2 - size/2, cury + ysize*(1-percent), size, ysize*percent, 0);
             else 
@@ -775,7 +778,7 @@ struct gui : g3d_gui
         int gapx1 = INT_MAX, gapy1 = INT_MAX, gapx2 = INT_MAX, gapy2 = INT_MAX;
         float wscale = 1.0f/(SKIN_W*SKIN_SCALE), hscale = 1.0f/(SKIN_H*SKIN_SCALE);
         bool quads = false;
-        glColor4f(1, 1, 1, alpha);
+        varray::colorf(1, 1, 1, alpha);
         loopi(n)
         {
             const patch &p = patches[start+i];
@@ -824,12 +827,11 @@ struct gui : g3d_gui
                         xstep = gapw+x+left-xo; 
                         tright = tleft+xstep*wscale;
                     }
-                    if(!quads) { quads = true; glBegin(GL_QUADS); }
-                    glTexCoord2f(tleft,  ttop);    glVertex2f(xo,       yo);
-                    glTexCoord2f(tright, ttop);    glVertex2f(xo+xstep, yo);
-                    glTexCoord2f(tright, tbottom); glVertex2f(xo+xstep, yo+ystep);
-                    glTexCoord2f(tleft,  tbottom); glVertex2f(xo,       yo+ystep);
-                    xtraverts += 4;
+                    if(!quads) { quads = true; varray::defvertex(2); varray::deftexcoord0(); varray::begin(GL_QUADS); }
+                    varray::attribf(xo,       yo);       varray::attribf(tleft,  ttop);
+                    varray::attribf(xo+xstep, yo);       varray::attribf(tright, ttop);
+                    varray::attribf(xo+xstep, yo+ystep); varray::attribf(tright, tbottom);
+                    varray::attribf(xo,       yo+ystep); varray::attribf(tleft,  tbottom);
                     if(!(p.flags&0x01)) break;
                     xo += xstep;
                 }
@@ -838,7 +840,7 @@ struct gui : g3d_gui
                 yo += ystep;
             }
         }
-        if(quads) glEnd();
+        if(quads) xtraverts += varray::end();
     } 
 
     vec origin, scale, *savedorigin;
@@ -888,10 +890,11 @@ struct gui : g3d_gui
             if(tcurrent && !*tcurrent) tcurrent = NULL;
             cury = -ysize; 
             curx = -xsize/2;
-            
-            glPushMatrix();
-            glTranslatef(origin.x, origin.y, origin.z);
-            glScalef(scale.x, scale.y, scale.z);
+           
+            pushhudmatrix();
+            hudmatrix.translate(origin);
+            hudmatrix.scale(scale); 
+            flushhudmatrix();
 
             drawskin(curx-skinx[2]*SKIN_SCALE, cury-skiny[6]*SKIN_SCALE, xsize, ysize, 0, 9, alpha);
             if(!tcurrent) drawskin(curx-skinx[5]*SKIN_SCALE, cury-skiny[6]*SKIN_SCALE, xsize, 0, 9, 1, alpha);
@@ -970,7 +973,7 @@ struct gui : g3d_gui
         else
         {
             if(tcurrent && tx<xsize) drawskin(curx+tx-skinx[5]*SKIN_SCALE, -ysize-skiny[6]*SKIN_SCALE, xsize-tx, FONTH, 9, 1, alpha);
-            glPopMatrix();
+            pophudmatrix();
         }
         poplist();
     }
@@ -1208,26 +1211,18 @@ void g3d_render()
 
     if(guis2d.length())
     {
+        hudmatrix.ortho(0, 1, 1, 0, -1, 1);
+        resethudmatrix();
+        hudshader->set();
+
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-        glMatrixMode(GL_PROJECTION);
-        glPushMatrix();
-        glLoadIdentity();
-        glOrtho(0, 1, 1, 0, -1, 1);
-
-        glMatrixMode(GL_MODELVIEW);
-        glPushMatrix();
-        glLoadIdentity();
-
         loopvrev(guis2d) guis2d[i].draw();
 
-        glMatrixMode(GL_PROJECTION);
-        glPopMatrix();
-        glMatrixMode(GL_MODELVIEW);
-        glPopMatrix();
-
         glDisable(GL_BLEND);
+
+        varray::disable();
     }
 
     flusheditors();
@@ -1244,16 +1239,17 @@ void g3d_render()
 void consolebox(int x1, int y1, int x2, int y2)
 {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glPushMatrix();
-    glTranslatef(x1, y1, 0);
     float bw = x2 - x1, bh = y2 - y1, aspect = bw/bh, sh = bh, sw = sh*aspect;
     bw *= float(4*FONTH)/(SKIN_H*SKIN_SCALE);
     bh *= float(4*FONTH)/(SKIN_H*SKIN_SCALE);
     sw /= bw + (gui::skinx[2]-gui::skinx[1] + gui::skinx[10]-gui::skinx[9])*SKIN_SCALE;
     sh /= bh + (gui::skiny[9]-gui::skiny[7] + gui::skiny[6]-gui::skiny[4])*SKIN_SCALE;
-    glScalef(sw, sh, 1);
+    pushhudmatrix();
+    hudmatrix.translate(x1, y1, 0);
+    hudmatrix.scale(sw, sh, 1);
+    flushhudmatrix();
     gui::drawskin(-gui::skinx[1]*SKIN_SCALE, -gui::skiny[4]*SKIN_SCALE, int(bw), int(bh), 0, 9, 0.60f);
     gui::drawskin((-gui::skinx[1] + gui::skinx[2] - gui::skinx[5])*SKIN_SCALE, -gui::skiny[4]*SKIN_SCALE, int(bw), 0, 9, 1, 0.60f);
-    glPopMatrix();
+    pophudmatrix();
 }
 
