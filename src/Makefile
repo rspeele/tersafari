@@ -488,18 +488,11 @@ fpsgame/entities-standalone.o: shared/glexts.h shared/varray.h
 fpsgame/entities-standalone.o: shared/iengine.h shared/igame.h fpsgame/ai.h
 fpsgame/server-standalone.o: fpsgame/game.h shared/cube.h shared/tools.h
 fpsgame/server-standalone.o: shared/geom.h shared/ents.h shared/command.h
-<<<<<<< HEAD
-fpsgame/server-standalone.o: shared/iengine.h shared/igame.h fpsgame/ai.h
-fpsgame/server-standalone.o: fpsgame/capture.h fpsgame/ctf.h
-fpsgame/server-standalone.o: fpsgame/elimination.h
-fpsgame/server-standalone.o: fpsgame/collect.h fpsgame/extinfo.h
-fpsgame/server-standalone.o: fpsgame/aiman.h
-=======
 fpsgame/server-standalone.o: shared/glexts.h shared/varray.h shared/iengine.h
 fpsgame/server-standalone.o: shared/igame.h fpsgame/ai.h fpsgame/capture.h
 fpsgame/server-standalone.o: fpsgame/ctf.h fpsgame/collect.h
+fpsgame/server-standalone.o: fpsgame/elimination.h
 fpsgame/server-standalone.o: fpsgame/extinfo.h fpsgame/aiman.h
->>>>>>> upstream/master
 
 engine/master-standalone.o: shared/cube.h shared/tools.h shared/geom.h
 engine/master-standalone.o: shared/ents.h shared/command.h shared/glexts.h

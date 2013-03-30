@@ -1321,8 +1321,8 @@ bool settexture(const char *name, int clamp)
 
 void enabletexture(const bool on)
 {
-    if(on) defaultshader->set();
-    else notextureshader->set();
+    // if(on) defaultshader->set();
+    // else notextureshader->set();
 }
 
 vector<VSlot *> vslots;
