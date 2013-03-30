@@ -18,11 +18,25 @@ MV=mv
 ifneq (,$(findstring MINGW,$(PLATFORM)))
 WINDRES= windres
 ifneq (,$(findstring 64,$(PLATFORM)))
+ifneq (,$(findstring CROSS,$(PLATFORM)))
+  CXX=x86_64-w64-mingw32-g++
+  WINDRES=x86_64-w64-mingw32-windres
+ifneq (,$(STRIP))
+  STRIP=x86_64-w64-mingw32-strip
+endif
+endif
 WINLIB=lib64
 WINBIN=../bin64
 override CXX+= -m64
 override WINDRES+= -F pe-x86-64
 else
+ifneq (,$(findstring CROSS,$(PLATFORM)))
+  CXX=i686-w64-mingw32-g++
+  WINDRES=i686-w64-mingw32-windres
+ifneq (,$(STRIP))
+  STRIP=i686-w64-mingw32-strip
+endif
+endif
 WINLIB=lib
 WINBIN=../bin
 override CXX+= -m32
@@ -34,10 +48,10 @@ STD_LIBS=
 else
 STD_LIBS= -static-libgcc -static-libstdc++
 endif
-CLIENT_LIBS= -mwindows $(STD_LIBS) -L$(WINBIN) -L$(WINLIB) -lSDL -lSDL_image -lSDL_mixer -lzlib1 -lopengl32 -lenet -lws2_32 -lwinmm
+CLIENT_LIBS= -mwindows $(STD_LIBS) -L$(WINBIN) -L$(WINLIB) -lSDL2 -lSDL2_image -lSDL2_mixer -lzlib1 -lopengl32 -lenet -lws2_32 -lwinmm
 else	
-CLIENT_INCLUDES= $(INCLUDES) -I/usr/X11R6/include `sdl-config --cflags`
-CLIENT_LIBS= -Lenet/.libs -lenet -L/usr/X11R6/lib -lX11 `sdl-config --libs` -lSDL_image -lSDL_mixer -lz -lGL
+CLIENT_INCLUDES= $(INCLUDES) -I/usr/X11R6/include `sdl2-config --cflags`
+CLIENT_LIBS= -Lenet/.libs -lenet -L/usr/X11R6/lib -lX11 `sdl2-config --libs` -lSDL2_image -lSDL2_mixer -lz -lGL
 endif
 ifeq ($(PLATFORM),Linux)
 CLIENT_LIBS+= -lrt
@@ -462,38 +476,35 @@ fpsgame/game.h.gch: shared/command.h shared/glexts.h shared/varray.h
 fpsgame/game.h.gch: shared/iengine.h shared/igame.h fpsgame/ai.h
 
 shared/crypto-standalone.o: shared/cube.h shared/tools.h shared/geom.h
-shared/crypto-standalone.o: shared/ents.h shared/command.h shared/glexts.h
-shared/crypto-standalone.o: shared/varray.h shared/iengine.h shared/igame.h
+shared/crypto-standalone.o: shared/ents.h shared/command.h shared/iengine.h
+shared/crypto-standalone.o: shared/igame.h
 shared/stream-standalone.o: shared/cube.h shared/tools.h shared/geom.h
-shared/stream-standalone.o: shared/ents.h shared/command.h shared/glexts.h
-shared/stream-standalone.o: shared/varray.h shared/iengine.h shared/igame.h
+shared/stream-standalone.o: shared/ents.h shared/command.h shared/iengine.h
+shared/stream-standalone.o: shared/igame.h
 shared/tools-standalone.o: shared/cube.h shared/tools.h shared/geom.h
-shared/tools-standalone.o: shared/ents.h shared/command.h shared/glexts.h
-shared/tools-standalone.o: shared/varray.h shared/iengine.h shared/igame.h
+shared/tools-standalone.o: shared/ents.h shared/command.h shared/iengine.h
+shared/tools-standalone.o: shared/igame.h
 engine/command-standalone.o: engine/engine.h shared/cube.h shared/tools.h
 engine/command-standalone.o: shared/geom.h shared/ents.h shared/command.h
-engine/command-standalone.o: shared/glexts.h shared/varray.h shared/iengine.h
-engine/command-standalone.o: shared/igame.h engine/world.h
+engine/command-standalone.o: shared/iengine.h shared/igame.h engine/world.h
 engine/server-standalone.o: engine/engine.h shared/cube.h shared/tools.h
 engine/server-standalone.o: shared/geom.h shared/ents.h shared/command.h
-engine/server-standalone.o: shared/glexts.h shared/varray.h shared/iengine.h
-engine/server-standalone.o: shared/igame.h engine/world.h
+engine/server-standalone.o: shared/iengine.h shared/igame.h engine/world.h
 engine/worldio-standalone.o: engine/engine.h shared/cube.h shared/tools.h
 engine/worldio-standalone.o: shared/geom.h shared/ents.h shared/command.h
-engine/worldio-standalone.o: shared/glexts.h shared/varray.h shared/iengine.h
-engine/worldio-standalone.o: shared/igame.h engine/world.h
+engine/worldio-standalone.o: shared/iengine.h shared/igame.h engine/world.h
 fpsgame/entities-standalone.o: fpsgame/game.h shared/cube.h shared/tools.h
 fpsgame/entities-standalone.o: shared/geom.h shared/ents.h shared/command.h
-fpsgame/entities-standalone.o: shared/glexts.h shared/varray.h
 fpsgame/entities-standalone.o: shared/iengine.h shared/igame.h fpsgame/ai.h
 fpsgame/server-standalone.o: fpsgame/game.h shared/cube.h shared/tools.h
 fpsgame/server-standalone.o: shared/geom.h shared/ents.h shared/command.h
-fpsgame/server-standalone.o: shared/glexts.h shared/varray.h shared/iengine.h
-fpsgame/server-standalone.o: shared/igame.h fpsgame/ai.h fpsgame/capture.h
-fpsgame/server-standalone.o: fpsgame/ctf.h fpsgame/collect.h
+
+fpsgame/server-standalone.o: shared/iengine.h shared/igame.h fpsgame/ai.h
+fpsgame/server-standalone.o: fpsgame/capture.h fpsgame/ctf.h
+fpsgame/server-standalone.o: fpsgame/collect.h fpsgame/extinfo.h
 fpsgame/server-standalone.o: fpsgame/elimination.h
-fpsgame/server-standalone.o: fpsgame/extinfo.h fpsgame/aiman.h
+fpsgame/server-standalone.o: fpsgame/aiman.h
 
 engine/master-standalone.o: shared/cube.h shared/tools.h shared/geom.h
-engine/master-standalone.o: shared/ents.h shared/command.h shared/glexts.h
-engine/master-standalone.o: shared/varray.h shared/iengine.h shared/igame.h
+engine/master-standalone.o: shared/ents.h shared/command.h shared/iengine.h
+engine/master-standalone.o: shared/igame.h

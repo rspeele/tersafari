@@ -57,12 +57,12 @@ void setupbloom(int w, int h)
 
     static uchar gray[3] = { 32, 32, 32 };
     static float grayf[3] = { 0.125f, 0.125f, 0.125f };
-    createtexture(bloomtex[4], 1, 1, hasTF ? (void *)grayf : (void *)gray, 3, 1, hasTF ? GL_RGB16F : GL_RGB16, GL_TEXTURE_RECTANGLE);
+    createtexture(bloomtex[4], 1, 1, hasTF ? (void *)grayf : (void *)gray, 3, 1, hasTF ? GL_RGB16F : GL_RGB16);
 
     loopi(5 + (bloomformat != GL_RGB ? 1 : 0))
     {
         glBindFramebuffer_(GL_FRAMEBUFFER, bloomfbo[i]);
-        glFramebufferTexture2D_(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE, bloomtex[i], 0);
+        glFramebufferTexture2D_(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, i==4 ? GL_TEXTURE_2D : GL_TEXTURE_RECTANGLE, bloomtex[i], 0);
 
         if(glCheckFramebufferStatus_(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
             fatal("failed allocating bloom buffer!");
@@ -239,7 +239,7 @@ void initao()
 void viewao()
 {
     if(!ao) return;
-    int w = min(screen->w, screen->h)/2, h = (w*screen->h)/screen->w;
+    int w = min(screenw, screenh)/2, h = (w*screenh)/screenw;
     SETSHADER(hudrect);
     varray::colorf(1, 1, 1);
     glBindTexture(GL_TEXTURE_RECTANGLE, aotex[2] ? aotex[2] : aotex[0]);
@@ -1107,7 +1107,7 @@ void processhdr(GLuint outfbo, int aa)
     b0h = b1h = bloomh;
 
     glActiveTexture_(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_RECTANGLE, bloomtex[4]);
+    glBindTexture(GL_TEXTURE_2D, bloomtex[4]);
     glActiveTexture_(GL_TEXTURE0);
 
     glBindFramebuffer_(GL_FRAMEBUFFER, b0fbo);
@@ -1261,7 +1261,7 @@ VAR(debugdepth, 0, 0, 1);
 
 void viewdepth()
 {
-    int w = min(screen->w, screen->h)/2, h = (w*screen->h)/screen->w;
+    int w = min(screenw, screenh)/2, h = (w*screenh)/screenw;
     SETSHADER(hudrect);
     varray::colorf(1, 1, 1);
     glBindTexture(GL_TEXTURE_RECTANGLE, gdepthtex);
@@ -1272,7 +1272,7 @@ VAR(debugrefract, 0, 0, 1);
 
 void viewrefract()
 {
-    int w = min(screen->w, screen->h)/2, h = (w*screen->h)/screen->w;
+    int w = min(screenw, screenh)/2, h = (w*screenh)/screenw;
     SETSHADER(hudrect);
     varray::colorf(1, 1, 1);
     glBindTexture(GL_TEXTURE_RECTANGLE, refracttex);
@@ -1406,7 +1406,7 @@ VARFP(gi, 0, 1, 1, { cleardeferredlightshaders(); cleanupradiancehints(); });
 VAR(debugrsm, 0, 0, 2);
 void viewrsm()
 {
-    int w = min(screen->w, screen->h)/2, h = (w*screen->h)/screen->w, x = screen->w-w, y = screen->h-h;
+    int w = min(screenw, screenh)/2, h = (w*screenh)/screenw, x = screenw-w, y = screenh-h;
     SETSHADER(hudrect);
     varray::colorf(1, 1, 1);
     glBindTexture(GL_TEXTURE_RECTANGLE, debugrsm == 2 ? rsmnormaltex : rsmcolortex);
@@ -1416,7 +1416,7 @@ void viewrsm()
 VAR(debugrh, 0, 0, RH_MAXSPLITS*(128 + 2));
 void viewrh()
 {
-    int w = min(screen->w, screen->h)/2, h = (w*screen->h)/screen->w, x = screen->w-w, y = screen->h-h;
+    int w = min(screenw, screenh)/2, h = (w*screenh)/screenw, x = screenw-w, y = screenh-h;
     SETSHADER(hud3d);
     varray::colorf(1, 1, 1);
     glBindTexture(GL_TEXTURE_3D, rhtex[1]);
@@ -1542,7 +1542,7 @@ static inline bool usesmcomparemode() { return !usegatherforsm() || (hasTG && ha
 
 void viewshadowatlas()
 {
-    int w = min(screen->w, screen->h)/2, h = (w*screen->h)/screen->w, x = screen->w-w, y = screen->h-h;
+    int w = min(screenw, screenh)/2, h = (w*screenh)/screenw, x = screenw-w, y = screenh-h;
     float tw = 1, th = 1;
     if(shadowatlastarget == GL_TEXTURE_RECTANGLE)
     {
@@ -2396,6 +2396,10 @@ void renderlights(float bsx1 = -1, float bsy1 = -1, float bsx2 = 1, float bsy2 =
         glStencilFunc(GL_EQUAL, stencilmask|0x08, ~0);
     }
 
+    glmatrix lightmatrix;
+    lightmatrix.identity();
+    GLOBALPARAM(lightmatrix, lightmatrix);
+
     if(sunpass)
     {
         int tx1 = max(int(floor((bsx1*0.5f+0.5f)*vieww)), 0), ty1 = max(int(floor((bsy1*0.5f+0.5f)*viewh)), 0),
@@ -2415,10 +2419,6 @@ void renderlights(float bsx1 = -1, float bsy1 = -1, float bsx2 = 1, float bsy2 =
     static vec lightcolorv[8], spotxv[8], spotyv[8];
     static vec2 shadowoffsetv[8];
 
-    glmatrix lightmatrix;
-    lightmatrix.identity();
-    GLOBALPARAM(lightmatrix, lightmatrix);
- 
     if(!lighttilebatch)
     {
         varray::disable();
@@ -2475,6 +2475,11 @@ void renderlights(float bsx1 = -1, float bsy1 = -1, float bsx2 = 1, float bsy2 =
                 shadowoffsetv[0] = vec2(sm.x + 0.5f*sm.size, sm.y + 0.5f*sm.size);
             }
 
+            lightmatrix = camprojmatrix;
+            lightmatrix.translate(l.o);
+            lightmatrix.scale(l.radius*lightradiustweak);
+            GLOBALPARAM(lightmatrix, lightmatrix);
+
             s->setvariant(0, (shadowmap ? 1 : 0) + 2 + (spotlight ? 4 : 0));
             lightpos.setv(lightposv, 1);
             lightcolor.setv(lightcolorv, 1);
@@ -2511,11 +2516,6 @@ void renderlights(float bsx1 = -1, float bsy1 = -1, float bsx2 = 1, float bsy2 =
                 glDepthFunc(GL_LESS);
                 glCullFace(GL_BACK);
             }
-
-            lightmatrix = camprojmatrix;
-            lightmatrix.translate(l.o);
-            lightmatrix.scale(l.radius*lightradiustweak);
-            LOCALPARAM(lightmatrix, lightmatrix);
 
             glDrawRangeElements_(GL_TRIANGLES, 0, lightspherenumverts-1, lightspherenumindices, GL_UNSIGNED_SHORT, lightsphereindices);
             xtraverts += lightspherenumindices;
@@ -2706,8 +2706,8 @@ void viewlightscissor()
                 lightinfo &l = lights[j];
                 if(l.sx1 >= l.sx2 || l.sy1 >= l.sy2 || l.sz1 >= l.sz2) break;
                 varray::colorf(l.color.x/255, l.color.y/255, l.color.z/255);
-                float x1 = (l.sx1+1)/2*screen->w, x2 = (l.sx2+1)/2*screen->w,
-                      y1 = (1-l.sy1)/2*screen->h, y2 = (1-l.sy2)/2*screen->h;
+                float x1 = (l.sx1+1)/2*screenw, x2 = (l.sx2+1)/2*screenw,
+                      y1 = (1-l.sy1)/2*screenh, y2 = (1-l.sy2)/2*screenh;
                 varray::begin(GL_TRIANGLE_STRIP);
                 varray::attribf(x1, y1);
                 varray::attribf(x2, y1);
@@ -3821,7 +3821,7 @@ void shademodelpreview(int x, int y, int w, int h, bool background, bool scissor
 
     GLERROR;
     
-    glViewport(0, 0, screen->w, screen->h);
+    glViewport(0, 0, screenw, screenh);
 }
 
 void shadegbuffer()
@@ -3861,6 +3861,7 @@ void shadegbuffer()
 
 void setupframe(int w, int h)
 {
+    GLERROR;
     setupgbuffer(w, h);
     if(hdr && (bloomw < 0 || bloomh < 0)) setupbloom(gw, gh);
     if(ao && (aow < 0 || aoh < 0)) setupao(gw, gh);

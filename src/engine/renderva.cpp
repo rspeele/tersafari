@@ -539,7 +539,8 @@ void renderoutline()
         {
             glBindBuffer_(GL_ARRAY_BUFFER, va->vbuf);
             glBindBuffer_(GL_ELEMENT_ARRAY_BUFFER, va->ebuf);
-            varray::vertexpointer(sizeof(vertex), ((vertex *)0)->pos.v);
+            const vertex *ptr = 0;
+            varray::vertexpointer(sizeof(vertex), ptr->pos.v);
         }
 
         if(va->texs && va->occluded < OCCLUDE_GEOM)
@@ -595,7 +596,8 @@ void renderblendbrush(GLuint tex, float x, float y, float w, float h)
         {
             glBindBuffer_(GL_ARRAY_BUFFER, va->vbuf);
             glBindBuffer_(GL_ELEMENT_ARRAY_BUFFER, va->ebuf);
-            varray::vertexpointer(sizeof(vertex), ((vertex *)0)->pos.v);
+            const vertex *ptr = 0;
+            varray::vertexpointer(sizeof(vertex), ptr->pos.v);
         }
 
         drawvatris(va, 3*va->tris, 0);
@@ -916,7 +918,8 @@ void rendershadowmapworld()
         {
             glBindBuffer_(GL_ARRAY_BUFFER, va->vbuf);
             glBindBuffer_(GL_ELEMENT_ARRAY_BUFFER, va->ebuf);
-            varray::vertexpointer(sizeof(vertex), ((vertex *)0)->pos.v);
+            const vertex *ptr = 0;
+            varray::vertexpointer(sizeof(vertex), ptr->pos.v);
         }
 
         if(!smnodraw) drawvatris(va, 3*va->tris, 0);
@@ -934,7 +937,8 @@ void rendershadowmapworld()
             {
                 glBindBuffer_(GL_ARRAY_BUFFER, va->vbuf);
                 glBindBuffer_(GL_ELEMENT_ARRAY_BUFFER, va->skybuf);
-                varray::vertexpointer(sizeof(vertex), ((vertex *)0)->pos.v);
+                const vertex *ptr = 0;
+                varray::vertexpointer(sizeof(vertex), ptr->pos.v);
             }
 
             if(!smnodraw) drawvaskytris(va);
@@ -1010,23 +1014,22 @@ struct renderstate
     int alphaing;
     GLuint vbuf;
     bool vattribs, vquery;
-    int diffusetmu;
     GLfloat color[4], fogcolor[4];
     vec colorscale;
     float alphascale;
     float refractscale;
     vec refractcolor;
     int blendx, blendy;
-    GLuint textures[8];
+    GLuint textures[7];
     Slot *slot, *texgenslot;
     VSlot *vslot, *texgenvslot;
     vec2 texgenscroll;
     int texgendim, texgenmillis;
 
-    renderstate() : colormask(true), depthmask(true), alphaing(0), vbuf(0), vattribs(false), vquery(false), diffusetmu(0), colorscale(1, 1, 1), alphascale(0), refractscale(0), refractcolor(1, 1, 1), blendx(-1), blendy(-1), slot(NULL), texgenslot(NULL), vslot(NULL), texgenvslot(NULL), texgenscroll(0, 0), texgendim(-1), texgenmillis(lastmillis)
+    renderstate() : colormask(true), depthmask(true), alphaing(0), vbuf(0), vattribs(false), vquery(false), colorscale(1, 1, 1), alphascale(0), refractscale(0), refractcolor(1, 1, 1), blendx(-1), blendy(-1), slot(NULL), texgenslot(NULL), vslot(NULL), texgenvslot(NULL), texgenscroll(0, 0), texgendim(-1), texgenmillis(lastmillis)
     {
         loopk(4) color[k] = 1;
-        loopk(8) textures[k] = 0;
+        loopk(7) textures[k] = 0;
     }
 };
 
@@ -1241,14 +1244,13 @@ static void changevbuf(renderstate &cur, int pass, vtxarray *va)
 static void changebatchtmus(renderstate &cur, int pass, geombatch &b)
 {
     bool changed = false;
-    int tmu = cur.diffusetmu+1;
     if(b.vslot.slot->shader->type&SHADER_ENVMAP && b.es.envmap!=EMID_CUSTOM)
     {
         GLuint emtex = lookupenvmap(b.es.envmap);
-        if(cur.textures[tmu]!=emtex)
+        if(cur.textures[TEX_ENVMAP]!=emtex)
         {
-            glActiveTexture_(GL_TEXTURE0+tmu);
-            glBindTexture(GL_TEXTURE_CUBE_MAP, cur.textures[tmu] = emtex);
+            glActiveTexture_(GL_TEXTURE0 + TEX_ENVMAP);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, cur.textures[TEX_ENVMAP] = emtex);
             changed = true;
         }
     }
@@ -1260,7 +1262,7 @@ static void changebatchtmus(renderstate &cur, int pass, geombatch &b)
         cur.blendy = b.va->o.y&~0xFFF;
         changed = true;
     }  
-    if(changed) glActiveTexture_(GL_TEXTURE0+cur.diffusetmu);
+    if(changed) glActiveTexture_(GL_TEXTURE0);
 }
 
 static void changeslottmus(renderstate &cur, int pass, Slot &slot, VSlot &vslot)
@@ -1268,8 +1270,8 @@ static void changeslottmus(renderstate &cur, int pass, Slot &slot, VSlot &vslot)
     if(pass==RENDERPASS_GBUFFER || pass==RENDERPASS_RSM)
     {
         GLuint diffusetex = slot.sts.empty() ? notexture->id : slot.sts[0].t->id;
-        if(cur.textures[cur.diffusetmu]!=diffusetex)
-            glBindTexture(GL_TEXTURE_2D, cur.textures[cur.diffusetmu] = diffusetex);
+        if(cur.textures[0]!=diffusetex)
+            glBindTexture(GL_TEXTURE_2D, cur.textures[0] = diffusetex);
 
         if(msaasamples && pass == RENDERPASS_GBUFFER) GLOBALPARAMF(hashid, (vslot.index));
     }
@@ -1296,31 +1298,31 @@ static void changeslottmus(renderstate &cur, int pass, Slot &slot, VSlot &vslot)
         cur.colorscale = vslot.colorscale;
         GLOBALPARAMF(colorparams, (vslot.colorscale.x, vslot.colorscale.y, vslot.colorscale.z, 1));
     }
-    int tmu = cur.diffusetmu+1, envmaptmu = -1;
-    if(slot.shader->type&SHADER_ENVMAP) envmaptmu = tmu++;
+
     loopvj(slot.sts)
     {
         Slot::Tex &t = slot.sts[j];
-        if(t.type==TEX_DIFFUSE || t.combined>=0) continue;
-        if(t.type==TEX_ENVMAP)
+        switch(t.type)
         {
-            if(envmaptmu>=0 && t.t && cur.textures[envmaptmu]!=t.t->id)
-            {
-                glActiveTexture_(GL_TEXTURE0+envmaptmu);
-                glBindTexture(GL_TEXTURE_CUBE_MAP, cur.textures[envmaptmu] = t.t->id);
-            }
-        }
-        else 
-        {
-            if(cur.textures[tmu]!=t.t->id)
-            {
-                glActiveTexture_(GL_TEXTURE0+tmu);
-                glBindTexture(GL_TEXTURE_2D, cur.textures[tmu] = t.t->id);
-            }
-            if(++tmu >= 8) break;
+            case TEX_ENVMAP:
+                if(t.t && cur.textures[t.type] != t.t->id)
+                {
+                    glActiveTexture_(GL_TEXTURE0 + t.type);
+                    glBindTexture(GL_TEXTURE_CUBE_MAP, cur.textures[t.type] = t.t->id);
+                }
+                break;
+            case TEX_NORMAL:
+            case TEX_GLOW:
+            case TEX_DECAL:
+                if(cur.textures[t.type] != t.t->id)
+                {
+                    glActiveTexture_(GL_TEXTURE0 + t.type);
+                    glBindTexture(GL_TEXTURE_2D, cur.textures[t.type] = t.t->id);
+                }
+                break;
         }
     }
-    glActiveTexture_(GL_TEXTURE0+cur.diffusetmu);
+    glActiveTexture_(GL_TEXTURE0);
 
     cur.slot = &slot;
     cur.vslot = &vslot;
@@ -1529,6 +1531,7 @@ void cleanupva()
 {
     clearvas(worldroot);
     clearqueries();
+    cleanupgrass();
 }
 
 void setupgeom(renderstate &cur)
@@ -1715,7 +1718,8 @@ void renderrsmgeom(bool dyntex)
             {
                 glBindBuffer_(GL_ARRAY_BUFFER, va->vbuf);
                 glBindBuffer_(GL_ELEMENT_ARRAY_BUFFER, va->skybuf);
-                varray::vertexpointer(sizeof(vertex), ((vertex *)0)->pos.v);
+                const vertex *ptr = 0;
+                varray::vertexpointer(sizeof(vertex), ptr->pos.v);
             }
 
             drawvaskytris(va);
@@ -1827,7 +1831,8 @@ void renderrefractmask()
         {
             glBindBuffer_(GL_ARRAY_BUFFER, va->vbuf);
             glBindBuffer_(GL_ELEMENT_ARRAY_BUFFER, va->ebuf);
-            varray::vertexpointer(sizeof(vertex), ((vertex *)0)->pos.v);
+            const vertex *ptr = 0;
+            varray::vertexpointer(sizeof(vertex), ptr->pos.v);
         }
 
         drawvatris(va, 3*va->refracttris, 3*(va->tris + va->blendtris + va->alphabacktris + va->alphafronttris));
@@ -1893,7 +1898,8 @@ bool renderexplicitsky(bool outline)
             }
             glBindBuffer_(GL_ARRAY_BUFFER, va->vbuf);
             glBindBuffer_(GL_ELEMENT_ARRAY_BUFFER, va->skybuf);
-            varray::vertexpointer(sizeof(vertex), ((vertex *)0)->pos.v);
+            const vertex *ptr = 0;
+            varray::vertexpointer(sizeof(vertex), ptr->pos.v);
         }
         drawvaskytris(va);
         xtraverts += va->sky/3;

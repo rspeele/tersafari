@@ -285,7 +285,7 @@ namespace server
 
         enum
         {
-            PUSHMILLIS = 2500
+            PUSHMILLIS = 3000
         };
 
         int calcpushrange()

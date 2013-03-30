@@ -863,7 +863,7 @@ SDL_Surface *creatergbasurface(SDL_Surface *os)
     SDL_Surface *ns = SDL_CreateRGBSurface(SDL_SWSURFACE, os->w, os->h, 32, RGBAMASKS);
     if(ns) 
     {
-        SDL_SetAlpha(os, 0, 0);
+        SDL_SetSurfaceBlendMode(os, SDL_BLENDMODE_NONE);
         SDL_BlitSurface(os, NULL, ns, NULL);
     }
     SDL_FreeSurface(os);
@@ -875,7 +875,7 @@ bool checkgrayscale(SDL_Surface *s)
     // gray scale images have 256 levels, no colorkey, and the palette is a ramp
     if(s->format->palette)
     {
-        if(s->format->palette->ncolors != 256 || s->format->colorkey) return false;
+        if(s->format->palette->ncolors != 256 || SDL_GetColorKey(s, NULL) >= 0) return false;
         const SDL_Color *colors = s->format->palette->colors;
         loopi(256) if(colors[i].r != i || colors[i].g != i || colors[i].b != i) return false;
     }
@@ -894,7 +894,7 @@ SDL_Surface *fixsurfaceformat(SDL_Surface *s)
     switch(s->format->BytesPerPixel)
     {
         case 1:
-            if(!checkgrayscale(s)) return s->format->colorkey ? creatergbasurface(s) : creatergbsurface(s);
+            if(!checkgrayscale(s)) return SDL_GetColorKey(s, NULL) >= 0 ? creatergbasurface(s) : creatergbsurface(s);
             break;
         case 3:
             if(s->format->Rmask != rgbmasks[0] || s->format->Gmask != rgbmasks[1] || s->format->Bmask != rgbmasks[2]) 
@@ -1699,6 +1699,9 @@ const struct slottex
     int id;
 } slottexs[] =
 {
+    {"0", TEX_DIFFUSE},
+    {"1", TEX_UNKNOWN},
+
     {"c", TEX_DIFFUSE},
     {"u", TEX_UNKNOWN},
     {"d", TEX_DECAL},
@@ -1723,7 +1726,7 @@ void texture(char *type, char *name, int *rot, int *xoffset, int *yoffset, float
     if(slots.length()>=0x10000) return;
     static int lastmatslot = -1;
     int tnum = findslottex(type), matslot = findmaterial(type);
-    if(tnum<0) tnum = atoi(type);
+    if(tnum<0) tnum = matslot >= 0 ? TEX_DIFFUSE : TEX_UNKNOWN;
     if(tnum==TEX_DIFFUSE) lastmatslot = matslot;
     else if(lastmatslot>=0) matslot = lastmatslot;
     else if(slots.empty()) return;
@@ -1933,7 +1936,8 @@ static void texcombine(Slot &s, int index, Slot::Tex &t, bool forceload = false)
     {
         case TEX_DIFFUSE:
         case TEX_NORMAL:
-            if(!ts.compressed) loopv(s.sts)
+            if(ts.compressed) break;
+            loopv(s.sts)
             {
                 Slot::Tex &a = s.sts[i];
                 if(a.combined!=index) continue;
@@ -1948,6 +1952,7 @@ static void texcombine(Slot &s, int index, Slot::Tex &t, bool forceload = false)
                 }
                 break; // only one combination
             }
+            if(ts.bpp < 3) forcergbimage(ts);
             break;
     }
     t.t = newtexture(NULL, key.getbuf(), ts, 0, true, true, true, compress);
@@ -2363,7 +2368,7 @@ void genenvmaps()
     if(envmaps.empty()) return;
     renderprogress(0, "generating environment maps...");
     int lastprogress = SDL_GetTicks();
-    setupframe(screen->w, screen->h);
+    setupframe(screenw, screenh);
     loopv(envmaps)
     {
         envmap &em = envmaps[i];
@@ -2970,9 +2975,9 @@ void screenshot(char *filename)
         concatstring(buf, imageexts[format]);         
     }
 
-    ImageData image(screen->w, screen->h, 3);
-    glPixelStorei(GL_PACK_ALIGNMENT, texalign(image.data, screen->w, 3));
-    glReadPixels(0, 0, screen->w, screen->h, GL_RGB, GL_UNSIGNED_BYTE, image.data);
+    ImageData image(screenw, screenh, 3);
+    glPixelStorei(GL_PACK_ALIGNMENT, texalign(image.data, screenw, 3));
+    glReadPixels(0, 0, screenw, screenh, GL_RGB, GL_UNSIGNED_BYTE, image.data);
     saveimage(path(buf), format, image, true);
 }
 

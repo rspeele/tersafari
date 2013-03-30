@@ -2,7 +2,7 @@
 
 #include "engine.h"
 
-bool hasVAO = false, hasTR = false, hasTSW = false, hasFBO = false, hasAFBO = false, hasDS = false, hasTF = false, hasCBF = false, hasS3TC = false, hasFXT1 = false, hasAF = false, hasFBB = false, hasFBMS = false, hasTMS = false, hasMSS = false, hasFBMSBS = false, hasNVFBMSC = false, hasNVTMS = false, hasUBO = false, hasMBR = false, hasDB = false, hasTG = false, hasT4 = false, hasTQ = false, hasPF = false, hasTRG = false, hasDBT = false, hasDC = false, hasDBGO = false, hasGPU4 = false, hasGPU5 = false;
+bool hasVAO = false, hasTR = false, hasTSW = false, hasFBO = false, hasAFBO = false, hasDS = false, hasTF = false, hasCBF = false, hasS3TC = false, hasFXT1 = false, hasAF = false, hasFBB = false, hasFBMS = false, hasTMS = false, hasMSS = false, hasFBMSBS = false, hasNVFBMSC = false, hasNVTMS = false, hasUBO = false, hasMBR = false, hasDB = false, hasTG = false, hasT4 = false, hasTQ = false, hasPF = false, hasTRG = false, hasDBT = false, hasDC = false, hasDBGO = false, hasGPU4 = false, hasGPU5 = false, hasEAL = false;
 bool mesa = false, intel = false, ati = false, nvidia = false;
 
 int hasstencil = 0;
@@ -175,6 +175,7 @@ PFNGLDRAWBUFFERSPROC glDrawBuffers_ = NULL;
 
 // OpenGL 3.0
 PFNGLGETSTRINGIPROC glGetStringi_ = NULL;
+PFNGLBINDFRAGDATALOCATIONPROC glBindFragDataLocation_ = NULL;
 
 // GL_ARB_uniform_buffer_object
 PFNGLGETUNIFORMINDICESPROC       glGetUniformIndices_       = NULL;
@@ -232,8 +233,6 @@ VAR(ati_minmax_bug, 0, 0, 1);
 VAR(ati_cubemap_bug, 0, 0, 1);
 VAR(ati_ubo_bug, 0, 0, 1);
 VAR(ati_pf_bug, 0, 0, 1);
-VAR(intel_immediate_bug, 0, 0, 1);
-VAR(intel_vertexarray_bug, 0, 0, 1);
 VAR(useubo, 1, 0, 0);
 VAR(usetexgather, 1, 0, 0);
 VAR(usetexcompress, 1, 0, 0);
@@ -298,8 +297,8 @@ void gl_checkextensions()
     conoutf(CON_INIT, "Driver: %s", version);
 
 #ifdef __APPLE__
-    extern int mac_osversion();
-    int osversion = mac_osversion();  /* 0x0A0500 = 10.5 (Leopard) */
+    // extern int mac_osversion();
+    // int osversion = mac_osversion();  /* 0x0A0600 = 10.6, assumed minimum */
 #endif
 
     if(strstr(renderer, "Mesa") || strstr(version, "Mesa"))
@@ -439,6 +438,7 @@ void gl_checkextensions()
     if(glversion >= 300)
     {
         glGetStringi_ = (PFNGLGETSTRINGIPROC)getprocaddress("glGetStringi");
+        glBindFragDataLocation_ =  (PFNGLBINDFRAGDATALOCATIONPROC)getprocaddress("glBindFragDataLocation");
     }
 
     const char *glslstr = (const char *)glGetString(GL_SHADING_LANGUAGE_VERSION);
@@ -477,12 +477,6 @@ void gl_checkextensions()
         oqfrags = 0;
     }
  
-#ifdef __APPLE__
-    /* VBOs over 256KB seem to destroy performance on 10.5, but not in 10.6 */
-    extern int maxvbosize;
-    if(osversion < 0x0A0600) maxvbosize = min(maxvbosize, 8192);  
-#endif
-
     if(glversion >= 300 || hasext("GL_ARB_vertex_array_object"))
     {
         glBindVertexArray_ =    (PFNGLBINDVERTEXARRAYPROC)   getprocaddress("glBindVertexArray");
@@ -511,10 +505,6 @@ void gl_checkextensions()
     }
     else
     {
-#ifdef __APPLE__
-        // floating point FBOs not fully supported until 10.5
-        if(osversion>=0x0A0500)
-#endif
         if(hasext("GL_ARB_texture_float"))
         {
             hasTF = true;
@@ -532,6 +522,7 @@ void gl_checkextensions()
         }
         if(hasext("GL_EXT_gpu_shader4"))
         {
+            glBindFragDataLocation_ = (PFNGLBINDFRAGDATALOCATIONPROC)getprocaddress("glBindFragDataLocationEXT");
             hasGPU4 = true;
             if(dbgexts) conoutf(CON_INIT, "Using GL_EXT_gpu_shader4 extension.");
         }
@@ -753,10 +744,22 @@ void gl_checkextensions()
         if(dbgexts) conoutf(CON_INIT, "Using GL_NV_depth_clamp extension.");
     }
 
+    if(glversion >= 330)
+    {
+        hasTSW = hasEAL = true;
+    }        
+    else
+    {
     if(hasext("GL_ARB_texture_swizzle") || hasext("GL_EXT_texture_swizzle"))
     {
         hasTSW = true;
         if(dbgexts) conoutf(CON_INIT, "Using GL_ARB_texture_swizzle extension.");
+    }
+        if(hasext("GL_ARB_explicit_attrib_location"))
+        {
+            hasEAL = true;
+            if(dbgexts) conoutf(CON_INIT, "Using GL_ARB_explicit_attrib_location extension.");
+        }
     }
 
     if(hasext("GL_ARB_debug_output"))
@@ -786,12 +789,7 @@ void gl_checkextensions()
     }
     else if(intel)
     {
-#ifdef __APPLE__
-        intel_immediate_bug = 1;
-#endif
 #ifdef WIN32
-        intel_immediate_bug = 1;
-        intel_vertexarray_bug = 1;
         gdepthstencil = 0; // workaround for buggy stencil on windows ivy bridge driver
 #endif
         glineardepth = 1; // causes massive slowdown in windows driver (and sometimes in linux driver) if not using linear depth
@@ -877,9 +875,9 @@ void synctimers()
         {
             GLint available = 0;
             while(!available)
-                glGetQueryObjectiv_(t.query[timercycle], GL_QUERY_RESULT_AVAILABLE_ARB, &available);
+                glGetQueryObjectiv_(t.query[timercycle], GL_QUERY_RESULT_AVAILABLE, &available);
             GLuint64EXT result = 0;
-            glGetQueryObjectui64v_(t.query[timercycle], GL_QUERY_RESULT_ARB, &result);
+            glGetQueryObjectui64v_(t.query[timercycle], GL_QUERY_RESULT, &result);
             t.result = max(float(result) * 1e-6f, 0.0f);
             t.waiting &= ~(1<<timercycle);
         }
@@ -926,10 +924,20 @@ void printtimers(int conw, int conh)
     if(totalmillis - lastprint >= 200) lastprint = totalmillis;
 }
          
-
-void gl_init(int w, int h, int bpp)
+void gl_resize(int w, int h)
 {
     glViewport(0, 0, w, h);
+    
+    vieww = w;
+    viewh = h;
+}
+
+void gl_init(int w, int h)
+{
+    GLERROR;
+
+    gl_resize(w, h);
+
     glClearColor(0, 0, 0, 0);
     glClearDepth(1);
     glClearStencil(0);
@@ -938,7 +946,6 @@ void gl_init(int w, int h, int bpp)
     glDisable(GL_STENCIL_TEST);
     glStencilFunc(GL_ALWAYS, 0, ~0);
     glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
-    glShadeModel(GL_SMOOTH);
     
     glEnable(GL_LINE_SMOOTH);
     //glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
@@ -949,6 +956,8 @@ void gl_init(int w, int h, int bpp)
 
     renderpath = R_GLSLANG;
 
+    varray::setup();
+
     extern void setupshaders();
     setupshaders();
 
@@ -957,8 +966,7 @@ void gl_init(int w, int h, int bpp)
 
     setuptexcompress();
 
-    vieww = w;
-    viewh = h;
+    GLERROR;
 }
 
 #define VARRAY_INTERNAL
@@ -1316,55 +1324,6 @@ void disablepolygonoffset(GLenum type)
    
     projmatrix = nooffsetmatrix; 
     setcamprojmatrix(false, true);
-}
-
-static int scissoring = 0;
-static GLint oldscissor[4];
-
-int pushscissor(float sx1, float sy1, float sx2, float sy2)
-{
-    scissoring = 0;
-
-    if(sx1 <= -1 && sy1 <= -1 && sx2 >= 1 && sy2 >= 1) return 0;
-
-    sx1 = max(sx1, -1.0f);
-    sy1 = max(sy1, -1.0f);
-    sx2 = min(sx2, 1.0f);
-    sy2 = min(sy2, 1.0f);
-
-    GLint viewport[4];
-    glGetIntegerv(GL_VIEWPORT, viewport);
-    int sx = viewport[0] + int(floor((sx1+1)*0.5f*viewport[2])),
-        sy = viewport[1] + int(floor((sy1+1)*0.5f*viewport[3])),
-        sw = viewport[0] + int(ceil((sx2+1)*0.5f*viewport[2])) - sx,
-        sh = viewport[1] + int(ceil((sy2+1)*0.5f*viewport[3])) - sy;
-    if(sw <= 0 || sh <= 0) return 0;
-
-    if(glIsEnabled(GL_SCISSOR_TEST))
-    {
-        glGetIntegerv(GL_SCISSOR_BOX, oldscissor);
-        sw += sx;
-        sh += sy;
-        sx = max(sx, int(oldscissor[0]));
-        sy = max(sy, int(oldscissor[1]));
-        sw = min(sw, int(oldscissor[0] + oldscissor[2])) - sx;
-        sh = min(sh, int(oldscissor[1] + oldscissor[3])) - sy;
-        if(sw <= 0 || sh <= 0) return 0;
-        scissoring = 2;
-    }
-    else scissoring = 1;
-
-    glScissor(sx, sy, sw, sh);
-    if(scissoring<=1) glEnable(GL_SCISSOR_TEST);
-    
-    return scissoring;
-}
-
-void popscissor()
-{
-    if(scissoring>1) glScissor(oldscissor[0], oldscissor[1], oldscissor[2], oldscissor[3]);
-    else if(scissoring) glDisable(GL_SCISSOR_TEST);
-    scissoring = 0;
 }
 
 bool calcspherescissor(const vec &center, float size, float &sx1, float &sy1, float &sx2, float &sy2, float &sz1, float &sz2)
@@ -1808,11 +1767,13 @@ void drawminimap()
 {
     if(!game::needminimap()) { clearminimap(); return; }
 
+    GLERROR;
     renderprogress(0, "generating mini-map...", 0, !renderedframe);
 
     drawtex = DRAWTEX_MINIMAP;
 
-    setupframe(screen->w, screen->h);
+    GLERROR;
+    setupframe(screenw, screenh);
 
     int size = 1<<minimapsize, sizelimit = min(hwtexsize, min(vieww, viewh));
     while(size > sizelimit) size /= 2;
@@ -2034,7 +1995,7 @@ namespace modelpreview
         modelpreview::background = background;
         modelpreview::scissor = scissor;
 
-        setupgbuffer(screen->w, screen->h);
+        setupgbuffer(screenw, screenh);
 
         useshaderbyname("modelpreview");
 

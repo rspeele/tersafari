@@ -27,7 +27,8 @@ extern const uchar fvmasks[64];
 extern const uchar faceedgesidx[6][4];
 extern bool inbetweenframes, renderedframe;
 
-extern SDL_Surface *screen;
+extern SDL_Window *screen;
+extern int screenw, screenh;
 
 extern vector<int> entgroup;
 
@@ -54,6 +55,8 @@ struct font
 #define MINRESH 480
 
 extern font *curfont;
+extern Shader *textshader;
+extern const matrix3x4 *textmatrix;
 
 // texture
 extern int hwtexsize, hwcubetexsize, hwmaxaniso, maxtexsize, hwtexunits, hwvtexunits;
@@ -106,7 +109,7 @@ static inline bool pvsoccluded(const ivec &bborigin, int size)
 }
 
 // rendergl
-extern bool hasVAO, hasTR, hasTSW, hasFBO, hasAFBO, hasDS, hasTF, hasCBF, hasS3TC, hasFXT1, hasAF, hasFBB, hasFBMS, hasTMS, hasMSS, hasFBMSBS, hasNVFBMSC, hasNVTMS, hasUBO, hasMBR, hasDB, hasTG, hasT4, hasTQ, hasPF, hasTRG, hasDBT, hasDC, hasDBGO, hasGPU4, hasGPU5;
+extern bool hasVAO, hasTR, hasTSW, hasFBO, hasAFBO, hasDS, hasTF, hasCBF, hasS3TC, hasFXT1, hasAF, hasFBB, hasFBMS, hasTMS, hasMSS, hasFBMSBS, hasNVFBMSC, hasNVTMS, hasUBO, hasMBR, hasDB, hasTG, hasT4, hasTQ, hasPF, hasTRG, hasDBT, hasDC, hasDBGO, hasGPU4, hasGPU5, hasEAL;
 extern int glversion, glslversion;
 
 enum { DRAWTEX_NONE = 0, DRAWTEX_ENVMAP, DRAWTEX_MINIMAP, DRAWTEX_MODELPREVIEW };
@@ -132,7 +135,8 @@ extern void glerror(const char *file, int line, GLenum error);
 #define GLERROR do { GLenum error = glGetError(); if(error != GL_NO_ERROR) glerror(__FILE__, __LINE__, error); } while(0)
 
 extern void gl_checkextensions();
-extern void gl_init(int w, int h, int bpp);
+extern void gl_init(int w, int h);
+extern void gl_resize(int w, int h);
 extern void cleangl();
 extern void gl_drawframe(int w, int h);
 extern void gl_drawmainmenu(int w, int h);
@@ -142,8 +146,6 @@ extern void disablepolygonoffset(GLenum type);
 extern bool calcspherescissor(const vec &center, float size, float &sx1, float &sy1, float &sx2, float &sy2, float &sz1, float &sz2);
 extern bool calcbbscissor(const ivec &bbmin, const ivec &bbmax, float &sx1, float &sy1, float &sx2, float &sy2);
 extern bool calcspotscissor(const vec &origin, float radius, const vec &dir, int spot, const vec &spotx, const vec &spoty, float &sx1, float &sy1, float &sx2, float &sy2, float &sz1, float &sz2);
-extern int pushscissor(float sx1, float sy1, float sx2, float sy2);
-extern void popscissor();
 extern void screenquad();
 extern void screenquad(float sw, float sh);
 extern void screenquadflipped(float sw, float sh);
@@ -544,8 +546,9 @@ extern void checksleep(int millis);
 extern void clearsleep(bool clearoverrides = true);
 
 // console
-extern void keypress(int code, bool isdown, int cooked);
 extern bool consoleprompt();
+extern void processkey(int code, bool isdown);
+extern void processtextinput(const char *str, int len);
 extern int rendercommand(int x, int y, int w);
 extern int renderconsole(int w, int h, int abovehud);
 extern void conoutf(const char *s, ...) PRINTFARGS(1, 2);
@@ -597,6 +600,14 @@ extern void getframemillis(float &avg, float &best, float &worst);
 extern void getfps(int &fps, int &bestdiff, int &worstdiff);
 extern void swapbuffers();
 extern int getclockmillis();
+
+enum { KR_CONSOLE = 1<<0, KR_GUI = 1<<1, KR_EDITMODE = 1<<2 };
+
+extern void keyrepeat(bool on, int mask = ~0);
+
+enum { TI_CONSOLE = 1<<0, TI_GUI = 1<<1 };
+
+extern void textinput(bool on, int mask = ~0);
 
 // menu
 extern void menuprocess();
@@ -672,6 +683,8 @@ extern bool renderexplicitsky(bool outline = false);
 // 3dgui
 extern void g3d_render();
 extern bool g3d_windowhit(bool on, bool act);
+extern bool g3d_key(int code, bool isdown);
+extern bool g3d_input(const char *str, int len);
 
 // menus
 extern int mainmenu;
@@ -692,6 +705,7 @@ extern void updatemumble();
 // grass
 extern void generategrass();
 extern void rendergrass();
+extern void cleanupgrass();
 
 // blendmap
 extern int blendpaintmode;
