@@ -488,7 +488,7 @@ bool consolekey(int code, bool isdown)
     #else
         #define MOD_KEYS (KMOD_LCTRL|KMOD_RCTRL)
     #endif
-    const SDLMod modifier = SDL_GetModState();
+    const SDL_Keymod modifier = SDL_GetModState();
 
     if(isdown)
     {
@@ -499,19 +499,19 @@ bool consolekey(int code, bool isdown)
                 break;
 
             case SDLK_a:
-                if(!(modifier&KMOD_CTRL)) goto insert;
+                if(!(modifier&KMOD_CTRL)) break;
             case SDLK_HOME:
                 if(strlen(commandbuf)) commandpos = 0;
                 break;
 
             case SDLK_e:
-                if(!(modifier&KMOD_CTRL)) goto insert;
+                if(!(modifier&KMOD_CTRL)) break;
             case SDLK_END:
                 commandpos = -1;
                 break;
 
             case SDLK_d:
-                if(!(modifier&(KMOD_CTRL|KMOD_ALT))) goto insert;
+                if(!(modifier&(KMOD_CTRL|KMOD_ALT))) break;
             case SDLK_DELETE:
             {
                 if(modifier&KMOD_ALT)
@@ -536,7 +536,7 @@ bool consolekey(int code, bool isdown)
             }
 
             case SDLK_b:
-                if(!(modifier&(KMOD_CTRL|KMOD_ALT))) goto insert;
+                if(!(modifier&(KMOD_CTRL|KMOD_ALT))) break;
             case SDLK_LEFT:
                 if(modifier&KMOD_ALT) commandpos = wordbackward(commandindex());
                 else if(commandpos>0) commandpos--;
@@ -544,7 +544,7 @@ bool consolekey(int code, bool isdown)
                 break;
 
             case SDLK_f:
-                if(!(modifier&(KMOD_CTRL|KMOD_ALT))) goto insert;
+                if(!(modifier&(KMOD_CTRL|KMOD_ALT))) break;
             case SDLK_RIGHT:
                 if(modifier&KMOD_ALT) commandpos = wordforward(commandpos);
                 else if(commandpos>=0) commandpos++;
@@ -552,14 +552,14 @@ bool consolekey(int code, bool isdown)
                 break;
 
             case SDLK_p:
-                if(!(modifier&KMOD_CTRL)) goto insert;
+                if(!(modifier&KMOD_CTRL)) break;
             case SDLK_UP:
                 if(histpos > history.length()) histpos = history.length();
                 if(histpos > 0) history[--histpos]->restore();
                 break;
 
             case SDLK_n:
-                if(!(modifier&KMOD_CTRL)) goto insert;
+                if(!(modifier&KMOD_CTRL)) break;
             case SDLK_DOWN:
                 if(histpos + 1 < history.length()) history[++histpos]->restore();
                 break;
@@ -572,7 +572,7 @@ bool consolekey(int code, bool isdown)
                 }
                 break;
             case SDLK_k:
-                if(!(modifier&KMOD_CTRL)) goto insert;
+                if(!(modifier&KMOD_CTRL)) break;
                 if(commandpos >= 0)
                 {
                     commandbuf[commandpos] = '\0';
@@ -581,25 +581,7 @@ bool consolekey(int code, bool isdown)
                 break;
 
             case SDLK_v:
-                if(modifier&MOD_KEYS) { pasteconsole(); return; }
-                // fall through
-        insert:
-            default:
-                resetcomplete();
-                if(cooked)
-                {
-                    size_t len = (int)strlen(commandbuf);
-                    if(len+1<sizeof(commandbuf))
-                    {
-                        if(commandpos<0) commandbuf[len] = cooked;
-                        else
-                        {
-                            memmove(&commandbuf[commandpos+1], &commandbuf[commandpos], len - commandpos);
-                            commandbuf[commandpos++] = cooked;
-                        }
-                        commandbuf[len+1] = '\0';
-                    }
-                }
+                if(modifier&MOD_KEYS) pasteconsole();
                 break;
         }
     }

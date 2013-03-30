@@ -115,7 +115,7 @@ namespace rawinput
             if(!g3d_movecursor(ev.dx, ev.dy)) mousemove(ev.dx, ev.dy);
             break;
         case REV_BUTTON:
-            keypress(ev.button, ev.state, 0);
+            processkey(ev.button, ev.state);
             break;
         }
     }
@@ -133,15 +133,17 @@ namespace rawinput
     // scrolling convenience
     void addscroll(int delta)
     {
+        const int wheeldown = -5;
+        const int wheelup = -4;
         for(int i = 0; i > delta; i--)
         {
-            addevent(rawevent(REV_BUTTON, -SDL_BUTTON_WHEELDOWN, 1));
-            addevent(rawevent(REV_BUTTON, -SDL_BUTTON_WHEELDOWN, 0));
+            addevent(rawevent(REV_BUTTON, wheeldown, 1));
+            addevent(rawevent(REV_BUTTON, wheeldown, 0));
         }
         for(int i = 0; i < delta; i++)
         {
-            addevent(rawevent(REV_BUTTON, -SDL_BUTTON_WHEELUP, 1));
-            addevent(rawevent(REV_BUTTON, -SDL_BUTTON_WHEELUP, 0));
+            addevent(rawevent(REV_BUTTON, wheelup, 1));
+            addevent(rawevent(REV_BUTTON, wheelup, 0));
         }
     }
 
@@ -436,8 +438,7 @@ namespace rawinput
           { BTN_RIGHT, -SDL_BUTTON_RIGHT },
           { BTN_MIDDLE, -SDL_BUTTON_MIDDLE },
           { BTN_SIDE, -SDL_BUTTON_X1 },
-          { BTN_EXTRA, -SDL_BUTTON_X2 },
-          { BTN_FORWARD, -SDL_BUTTON_WHEELUP }
+          { BTN_EXTRA, -SDL_BUTTON_X2 }
         };
         static const int numbuttons = sizeof(lookup) / sizeof(buttonmap);
 
@@ -508,8 +509,6 @@ namespace rawinput
                 if(thread) // this shouldn't happen...
                 {
                     conoutf(CON_ERROR, "linux raw input killing unexpected survivor thread");
-                    SDL_KillThread(thread);
-                    thread = NULL;
                 }
             }
             else
@@ -532,7 +531,7 @@ namespace rawinput
             cease = false;
             reins = SDL_CreateMutex();
             if(!reins) return;
-            thread = SDL_CreateThread(worker, NULL);
+            thread = SDL_CreateThread(worker, "mouse", NULL);
         }
     }
     void searchdevs(bool (*handle)(int, const char *))
