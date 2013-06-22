@@ -41,6 +41,9 @@ enum { ENT_PLAYER = 0, ENT_CAMERA, ENT_BOUNCE };
 
 enum { COLLIDE_AABB = 0, COLLIDE_OBB, COLLIDE_ELLIPSE };
 
+#define CROUCHTIME 150
+#define CROUCHHEIGHT 0.75f
+
 struct physent                                  // base entity type, can be affected by physics
 {
     vec o, vel;                                 // origin, velocity
@@ -48,28 +51,28 @@ struct physent                                  // base entity type, can be affe
     float yaw, pitch, roll;
     float maxspeed;                             // cubes per second, 90 for player
     int timeinair;
-    float radius, eyeheight, aboveeye;          // bounding box size
+    float radius, eyeheight, maxheight, aboveeye; // bounding box size
     float xradius, yradius, zmargin;
     vec floor;                                  // the normal of floor the dynent is on
 
     int inwater;
     bool jumping;
-    char move, strafe;
+    char move, strafe, crouching;
 
     uchar physstate;                            // one of PHYS_* above
     uchar state, editstate;                     // one of CS_* above
     uchar type;                                 // one of ENT_* above
-    uchar collidetype;                          // one of COLLIDE_* above           
+    uchar collidetype;                          // one of COLLIDE_* above
 
     bool blocked;                               // used by physics to signal ai
 
-    physent() : o(0, 0, 0), deltapos(0, 0, 0), newpos(0, 0, 0), yaw(0), pitch(0), roll(0), maxspeed(90), 
-               radius(4.1f), eyeheight(14), aboveeye(1), xradius(4.1f), yradius(4.1f), zmargin(0),
+    physent() : o(0, 0, 0), deltapos(0, 0, 0), newpos(0, 0, 0), yaw(0), pitch(0), roll(0), maxspeed(90),
+               radius(4.1f), eyeheight(14), maxheight(14), aboveeye(1), xradius(4.1f), yradius(4.1f), zmargin(0),
                state(CS_ALIVE), editstate(CS_ALIVE), type(ENT_PLAYER),
                collidetype(COLLIDE_ELLIPSE),
                blocked(false)
                { reset(); }
-              
+
     void resetinterp()
     {
         newpos = o;
@@ -80,7 +83,8 @@ struct physent                                  // base entity type, can be affe
     {
     	inwater = 0;
         timeinair = 0;
-        strafe = move = 0;
+        eyeheight = maxheight;
+        strafe = move = crouching = 0;
         physstate = PHYS_FALL;
         vel = vec(0, 0, 0);
         floor = vec(0, 0, 1);
@@ -96,10 +100,13 @@ enum
 {
     ANIM_DEAD = 0, ANIM_DYING, ANIM_IDLE,
     ANIM_FORWARD, ANIM_BACKWARD, ANIM_LEFT, ANIM_RIGHT,
+    ANIM_CROUCH, ANIM_CROUCH_FORWARD, ANIM_CROUCH_BACKWARD, ANIM_CROUCH_LEFT, ANIM_CROUCH_RIGHT,
+
     ANIM_HOLD1, ANIM_HOLD2, ANIM_HOLD3, ANIM_HOLD4, ANIM_HOLD5, ANIM_HOLD6, ANIM_HOLD7,
     ANIM_ATTACK1, ANIM_ATTACK2, ANIM_ATTACK3, ANIM_ATTACK4, ANIM_ATTACK5, ANIM_ATTACK6, ANIM_ATTACK7,
     ANIM_PAIN,
     ANIM_JUMP, ANIM_SINK, ANIM_SWIM,
+    ANIM_CROUCH_JUMP, ANIM_CROUCH_SINK, ANIM_CROUCH_SWIM,
     ANIM_EDIT, ANIM_LAG, ANIM_TAUNT, ANIM_WIN, ANIM_LOSE,
     ANIM_GUN_IDLE, ANIM_GUN_SHOOT,
     ANIM_VWEP_IDLE, ANIM_VWEP_SHOOT, ANIM_SHIELD, ANIM_POWERUP,
@@ -111,10 +118,12 @@ static const char * const animnames[] =
 {
     "dead", "dying", "idle",
     "forward", "backward", "left", "right",
+    "crouch", "crouch forward", "crouch backward", "crouch left", "crouch right",
     "hold 1", "hold 2", "hold 3", "hold 4", "hold 5", "hold 6", "hold 7",
     "attack 1", "attack 2", "attack 3", "attack 4", "attack 5", "attack 6", "attack 7",
     "pain",
     "jump", "sink", "swim",
+    "crouch jump", "crouch sink", "crouch swim",
     "edit", "lag", "taunt", "win", "lose",
     "gun idle", "gun shoot",
     "vwep idle", "vwep shoot", "shield", "powerup",
@@ -138,8 +147,7 @@ static const char * const animnames[] =
 #define ANIM_RAGDOLL     (1<<27)
 #define ANIM_SETSPEED    (1<<28)
 #define ANIM_NOPITCH     (1<<29)
-#define ANIM_GHOST       (1<<30)
-#define ANIM_FLAGS       (0x1FF<<22)
+#define ANIM_FLAGS       (0xFF<<22)
 
 struct animinfo // description of a character's animation
 {
@@ -196,7 +204,7 @@ struct dynent : physent                         // animated characters, or chara
     void stopmoving()
     {
         k_left = k_right = k_up = k_down = jumping = false;
-        move = strafe = 0;
+        move = strafe = crouching = 0;
     }
         
     void reset()

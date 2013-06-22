@@ -216,6 +216,7 @@ namespace game
             }
             if(d->state==CS_ALIVE || d->state==CS_EDITING)
             {
+                crouchplayer(d, 10, false);
                 if(smoothmove && d->smoothmillis>0) predictplayer(d, true);
                 else moveplayer(d, 1, false);
             }
@@ -251,6 +252,7 @@ namespace game
         else if(!intermission)
         {
             if(player1->ragdoll) cleanragdoll(player1);
+            crouchplayer(player1, 10, true);
             moveplayer(player1, 10, true);
             swayhudgun(curtime);
             entities::checkitems(player1);
@@ -302,6 +304,11 @@ namespace game
     bool canjump()
     {
         if(!intermission) respawn();
+        return player1->state!=CS_DEAD && !intermission;
+    }
+
+    bool cancrouch()
+    {
         return player1->state!=CS_DEAD && !intermission;
     }
 
@@ -802,6 +809,11 @@ namespace game
         return showmodeinfo && m_valid(gamemode) ? gamemodes[gamemode - STARTGAMEMODE].info : NULL;
     }
 
+    const char *getscreenshotinfo()
+    {
+        return server::modename(gamemode, NULL);
+    }
+
     void physicstrigger(physent *d, bool local, int floorlevel, int waterlevel, int material)
     {
         if     (waterlevel>0) { if(material!=MAT_LAVA) playsound(S_SPLASH1, d==player1 ? NULL : &d->o); }
@@ -905,14 +917,14 @@ namespace game
     {
         settexture("packages/hud/items.png");
         float tsz = 0.25f, tx = tsz*(icon%4), ty = tsz*(icon/4);
-        varray::defvertex(2);
-        varray::deftexcoord0();
-        varray::begin(GL_TRIANGLE_STRIP);
-        varray::attribf(x,    y);    varray::attribf(tx,     ty);
-        varray::attribf(x+sz, y);    varray::attribf(tx+tsz, ty);
-        varray::attribf(x,    y+sz); varray::attribf(tx,     ty+tsz);
-        varray::attribf(x+sz, y+sz); varray::attribf(tx+tsz, ty+tsz);
-        varray::end();
+        gle::defvertex(2);
+        gle::deftexcoord0();
+        gle::begin(GL_TRIANGLE_STRIP);
+        gle::attribf(x,    y);    gle::attribf(tx,     ty);
+        gle::attribf(x+sz, y);    gle::attribf(tx+tsz, ty);
+        gle::attribf(x,    y+sz); gle::attribf(tx,     ty+tsz);
+        gle::attribf(x+sz, y+sz); gle::attribf(tx+tsz, ty+tsz);
+        gle::end();
     }
 
     float abovegameplayhud(int w, int h)

@@ -43,9 +43,9 @@ struct PackNode
     void reserve(ushort tx, ushort ty, ushort tw, ushort th);
 };
 
-extern bvec ambientcolor, sunlightcolor;
-extern float ambientscale, sunlightscale;
-extern int sunlight;
+extern bvec ambientcolor, skylightcolor, sunlightcolor;
+extern float ambientscale, skylightscale, sunlightscale;
+extern int skylight, sunlight;
 extern float sunlightyaw, sunlightpitch;
 extern vec sunlightdir;
 extern int fullbright, fullbrightlevel;
@@ -78,7 +78,9 @@ struct lerpbounds
 
 extern void calcnormals(bool lerptjoints = false);
 extern void clearnormals();
-extern void findnormal(const vec &key, const vec &surface, vec &v);
+extern void resetsmoothgroups();
+extern int smoothangle(int id, int angle);
+extern void findnormal(const vec &key, int smooth, const vec &surface, vec &v);
 extern void calclerpverts(const vec2 *c, const vec *n, lerpvert *lv, int &numv);
 extern void initlerpbounds(float u, float v, const lerpvert *lv, int numv, lerpbounds &start, lerpbounds &end);
 extern void lerpnormal(float u, float v, const lerpvert *lv, int numv, lerpbounds &start, lerpbounds &end, vec &normal, vec &nstep);

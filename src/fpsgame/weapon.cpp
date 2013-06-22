@@ -968,7 +968,7 @@ namespace game
             }
             pitch = -bnc.roll;
             if(bnc.bouncetype==BNC_GRENADE)
-                rendermodel("projectiles/grenade", ANIM_MAPMODEL|ANIM_LOOP, pos, yaw, pitch, MDL_CULL_VFC|MDL_CULL_OCCLUDED);
+                rendermodel("projectiles/grenade", ANIM_MAPMODEL|ANIM_LOOP, pos, yaw, pitch, 0, MDL_CULL_VFC|MDL_CULL_OCCLUDED);
             else
             {
                 const char *mdl = NULL;
@@ -982,7 +982,7 @@ namespace game
                     case BNC_BARRELDEBRIS: mdl = barreldebrisnames[bnc.variant]; break;
                     default: continue;
                 }
-                rendermodel(mdl, ANIM_MAPMODEL|ANIM_LOOP, pos, yaw, pitch, cull, NULL, NULL, 0, 0, fade);
+                rendermodel(mdl, ANIM_MAPMODEL|ANIM_LOOP, pos, yaw, pitch, 0, cull, NULL, NULL, 0, 0, fade);
             }
         }
     }
@@ -1002,7 +1002,7 @@ namespace game
             yaw += 90;
             v.mul(3);
             v.add(pos);
-            rendermodel("projectiles/rocket", ANIM_MAPMODEL|ANIM_LOOP, v, yaw, pitch, MDL_CULL_VFC|MDL_CULL_OCCLUDED);
+            rendermodel("projectiles/rocket", ANIM_MAPMODEL|ANIM_LOOP, v, yaw, pitch, 0, MDL_CULL_VFC|MDL_CULL_OCCLUDED);
             particle_fireball(pos, 1.5f, PART_EXPLOSION, 15, 0xFF8080, 1.0f);
         }
     }

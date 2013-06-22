@@ -55,6 +55,7 @@ Texture *loadskyoverlay(const char *basename)
 SVARFR(skybox, "", { if(skybox[0]) loadsky(skybox, sky); }); 
 HVARR(skyboxcolour, 0, 0xFFFFFF, 0xFFFFFF);
 FVARR(skyboxoverbright, 1, 2, 16);
+FVARR(skyboxoverbrightmin, 0, 1, 16);
 FVARR(skyboxoverbrightthreshold, 0, 0.7f, 1);
 FVARR(spinsky, -720, 0, 720);
 VARR(yawsky, 0, 0, 360);
@@ -85,12 +86,12 @@ void draw_envbox_face(float s0, float t0, int x0, int y0, int z0,
                       GLuint texture)
 {
     glBindTexture(GL_TEXTURE_2D, texture);
-    varray::begin(GL_TRIANGLE_STRIP);
-    varray::attribf(x3, y3, z3); varray::attribf(s3, t3);
-    varray::attribf(x2, y2, z2); varray::attribf(s2, t2);
-    varray::attribf(x0, y0, z0); varray::attribf(s0, t0);
-    varray::attribf(x1, y1, z1); varray::attribf(s1, t1);
-    xtraverts += varray::end();
+    gle::begin(GL_TRIANGLE_STRIP);
+    gle::attribf(x3, y3, z3); gle::attribf(s3, t3);
+    gle::attribf(x2, y2, z2); gle::attribf(s2, t2);
+    gle::attribf(x0, y0, z0); gle::attribf(s0, t0);
+    gle::attribf(x1, y1, z1); gle::attribf(s1, t1);
+    xtraverts += gle::end();
 }
 
 void draw_envbox(int w, float z1clip = 0.0f, float z2clip = 1.0f, int faces = 0x3F, Texture **sky = NULL)
@@ -100,8 +101,8 @@ void draw_envbox(int w, float z1clip = 0.0f, float z2clip = 1.0f, int faces = 0x
     float v1 = 1-z1clip, v2 = 1-z2clip;
     int z1 = int(ceil(2*w*(z1clip-0.5f))), z2 = int(ceil(2*w*(z2clip-0.5f)));
 
-    varray::defvertex();
-    varray::deftexcoord0();
+    gle::defvertex();
+    gle::deftexcoord0();
 
     if(faces&0x01)
         draw_envbox_face(0.0f, v2,  -w, -w, z2,
@@ -139,7 +140,7 @@ void draw_envbox(int w, float z1clip = 0.0f, float z2clip = 1.0f, int faces = 0x
                          1.0f, 0.0f, -w, -w, w,
                          1.0f, 1.0f,  w, -w, w, sky[5] ? sky[5]->id : notexture->id);
 
-    varray::disable();
+    gle::disable();
 }
 
 void draw_env_overlay(int w, Texture *overlay = NULL, float tx = 0, float ty = 0)
@@ -147,165 +148,39 @@ void draw_env_overlay(int w, Texture *overlay = NULL, float tx = 0, float ty = 0
     float z = w*cloudheight, tsz = 0.5f*(1-cloudfade)/cloudscale, psz = w*(1-cloudfade);
     glBindTexture(GL_TEXTURE_2D, overlay ? overlay->id : notexture->id);
     vec color = vec::hexcolor(cloudcolour);
-    varray::color(color, cloudalpha);
-    varray::defvertex();
-    varray::deftexcoord0();
-    varray::begin(GL_TRIANGLE_FAN);
+    gle::color(color, cloudalpha);
+    gle::defvertex();
+    gle::deftexcoord0();
+    gle::begin(GL_TRIANGLE_FAN);
     loopi(cloudsubdiv+1)
     {
         vec p(1, 1, 0);
         p.rotate_around_z((-2.0f*M_PI*i)/cloudsubdiv);
-        varray::attribf(p.x*psz, p.y*psz, z); 
-            varray::attribf(tx + p.x*tsz, ty + p.y*tsz);
+        gle::attribf(p.x*psz, p.y*psz, z); 
+            gle::attribf(tx + p.x*tsz, ty + p.y*tsz);
     }
-    xtraverts += varray::end();
+    xtraverts += gle::end();
     float tsz2 = 0.5f/cloudscale;
-    varray::defvertex();
-    varray::deftexcoord0();
-    varray::defcolor(4);
-    varray::begin(GL_TRIANGLE_STRIP);
+    gle::defvertex();
+    gle::deftexcoord0();
+    gle::defcolor(4);
+    gle::begin(GL_TRIANGLE_STRIP);
     loopi(cloudsubdiv+1)
     {
         vec p(1, 1, 0);
         p.rotate_around_z((-2.0f*M_PI*i)/cloudsubdiv);
-        varray::attribf(p.x*psz, p.y*psz, z);
-            varray::attribf(tx + p.x*tsz, ty + p.y*tsz);
-            varray::attribf(color.r, color.g, color.b, cloudalpha);
-        varray::attribf(p.x*w, p.y*w, z);
-            varray::attribf(tx + p.x*tsz2, ty + p.y*tsz2);
-            varray::attribf(color.r, color.g, color.b, 0);
+        gle::attribf(p.x*psz, p.y*psz, z);
+            gle::attribf(tx + p.x*tsz, ty + p.y*tsz);
+            gle::attribf(color.r, color.g, color.b, cloudalpha);
+        gle::attribf(p.x*w, p.y*w, z);
+            gle::attribf(tx + p.x*tsz2, ty + p.y*tsz2);
+            gle::attribf(color.r, color.g, color.b, 0);
     }
-    xtraverts += varray::end();
-    varray::disable();
+    xtraverts += gle::end();
+    gle::disable();
 }
 
-static struct domevert
-{
-    vec pos;
-    uchar color[4];
-
-	domevert() {}
-	domevert(const vec &pos, const bvec &fcolor, float alpha) : pos(pos)
-	{
-		memcpy(color, fcolor.v, 3);
-		color[3] = uchar(alpha*255);
-	}
-	domevert(const domevert &v0, const domevert &v1) : pos(vec(v0.pos).add(v1.pos).normalize())
-	{
-        memcpy(color, v0.color, 4);
-        if(v0.pos.z != v1.pos.z) color[3] += uchar((v1.color[3] - v0.color[3]) * (pos.z - v0.pos.z) / (v1.pos.z - v0.pos.z));
-	}
-} *domeverts = NULL;
-static GLushort *domeindices = NULL;
-static int domenumverts = 0, domenumindices = 0, domecapindices = 0;
-static GLuint domevbuf = 0, domeebuf = 0;
-static bvec domecolor(0, 0, 0);
-static float domeminalpha = 0, domemaxalpha = 0, domecapsize = -1, domeclipz = 1;
-
-static void subdivide(int depth, int face);
-
-static void genface(int depth, int i1, int i2, int i3)
-{
-    int face = domenumindices; domenumindices += 3;
-    domeindices[face]   = i3;
-    domeindices[face+1] = i2;
-    domeindices[face+2] = i1;
-    subdivide(depth, face);
-}
-
-static void subdivide(int depth, int face)
-{
-    if(depth-- <= 0) return;
-    int idx[6];
-    loopi(3) idx[i] = domeindices[face+2-i];
-    loopi(3)
-    {
-        int vert = domenumverts++;
-        domeverts[vert] = domevert(domeverts[idx[i]], domeverts[idx[(i+1)%3]]); //push on to unit sphere
-        idx[3+i] = vert;
-        domeindices[face+2-i] = vert;
-    }
-    subdivide(depth, face);
-    loopi(3) genface(depth, idx[i], idx[3+i], idx[3+(i+2)%3]);
-}
-
-static int sortdomecap(GLushort x, GLushort y)
-{
-    const vec &xv = domeverts[x].pos, &yv = domeverts[y].pos;
-    return xv.y < 0 ? yv.y >= 0 || xv.x < yv.x : yv.y >= 0 && xv.x > yv.x;
-}
-
-static void initdome(const bvec &color, float minalpha = 0.0f, float maxalpha = 1.0f, float capsize = -1, float clipz = 1, int hres = 16, int depth = 2)
-{
-    const int tris = hres << (2*depth);
-    domenumverts = domenumindices = domecapindices = 0;
-    domeverts = new domevert[tris+1 + (capsize >= 0 ? 1 : 0)];
-    domeindices = new GLushort[(tris + (capsize >= 0 ? hres<<depth : 0))*3];
-    if(clipz >= 1)
-    {
-        domeverts[domenumverts++] = domevert(vec(0.0f, 0.0f, 1.0f), color, minalpha); //build initial 'hres' sided pyramid
-        loopi(hres) domeverts[domenumverts++] = domevert(vec(sincos360[(360*i)/hres], 0.0f), color, maxalpha);
-        loopi(hres) genface(depth, 0, i+1, 1+(i+1)%hres);
-    }
-    else if(clipz <= 0)
-    {
-        loopi(hres<<depth) domeverts[domenumverts++] = domevert(vec(sincos360[(360*i)/(hres<<depth)], 0.0f), color, maxalpha);
-    }
-    else
-    {
-        float clipxy = sqrtf(1 - clipz*clipz);
-        const vec2 &scm = sincos360[180/hres];
-        loopi(hres)
-        {
-            const vec2 &sc = sincos360[(360*i)/hres];
-            domeverts[domenumverts++] = domevert(vec(sc.x*clipxy, sc.y*clipxy, clipz), color, minalpha);
-            domeverts[domenumverts++] = domevert(vec(sc.x, sc.y, 0.0f), color, maxalpha);
-            domeverts[domenumverts++] = domevert(vec(sc.x*scm.x - sc.y*scm.y, sc.y*scm.x + sc.x*scm.y, 0.0f), color, maxalpha);
-        }
-        loopi(hres)
-        {
-            genface(depth-1, 3*i, 3*i+1, 3*i+2);
-            genface(depth-1, 3*i, 3*i+2, 3*((i+1)%hres));
-            genface(depth-1, 3*i+2, 3*((i+1)%hres)+1, 3*((i+1)%hres));
-        }
-    }
-
-    if(capsize >= 0)
-    {
-        GLushort *domecap = &domeindices[domenumindices];
-        int domecapverts = 0;
-        loopi(domenumverts) if(!domeverts[i].pos.z) domecap[domecapverts++] = i;
-        domeverts[domenumverts++] = domevert(vec(0.0f, 0.0f, -capsize), color, maxalpha);
-        quicksort(domecap, domecapverts, sortdomecap); 
-        loopi(domecapverts)
-        {
-            int n = domecapverts-1-i;
-            domecap[n*3] = domecap[n];
-            domecap[n*3+1] = domecap[(n+1)%domecapverts];
-            domecap[n*3+2] = domenumverts-1;
-            domecapindices += 3;
-        }
-    }
-
-    if(!domevbuf) glGenBuffers_(1, &domevbuf);
-    glBindBuffer_(GL_ARRAY_BUFFER, domevbuf);
-    glBufferData_(GL_ARRAY_BUFFER, domenumverts*sizeof(domevert), domeverts, GL_STATIC_DRAW);
-    DELETEA(domeverts);
-
-    if(!domeebuf) glGenBuffers_(1, &domeebuf);
-    glBindBuffer_(GL_ELEMENT_ARRAY_BUFFER, domeebuf);
-    glBufferData_(GL_ELEMENT_ARRAY_BUFFER, (domenumindices + domecapindices)*sizeof(GLushort), domeindices, GL_STATIC_DRAW);
-    DELETEA(domeindices);
-}
-
-static void deletedome()
-{
-	domenumverts = domenumindices = 0;
-    if(domevbuf) { glDeleteBuffers_(1, &domevbuf); domevbuf = 0; }
-    if(domeebuf) { glDeleteBuffers_(1, &domeebuf); domeebuf = 0; }
-}
-
-FVARR(fogdomeheight, -1, -0.5f, 1); 
+FVARR(fogdomeheight, -1, -0.5f, 1);
 FVARR(fogdomemin, 0, 0, 1);
 FVARR(fogdomemax, 0, 0, 1);
 VARR(fogdomecap, 0, 1, 1);
@@ -315,49 +190,174 @@ HVARFR(fogdomecolour, 0, 0, 0xFFFFFF,
 {
     fogdomecolor = bvec((fogdomecolour>>16)&0xFF, (fogdomecolour>>8)&0xFF, fogdomecolour&0xFF);
 });
+VARR(fogdomeclouds, 0, 1, 1);
 
-static void drawdome()
+namespace dome
 {
-    float capsize = fogdomecap && fogdomeheight < 1 ? (1 + fogdomeheight) / (1 - fogdomeheight) : -1;
-    bvec color = fogdomecolour ? fogdomecolor : fogcolor;
-    if(!domenumverts || domecolor != color || domeminalpha != fogdomemin || domemaxalpha != fogdomemax || domecapsize != capsize || domeclipz != fogdomeclip) 
+    struct vert
     {
-        initdome(color, min(fogdomemin, fogdomemax), fogdomemax, capsize, fogdomeclip);
-        domecolor = color;
-        domeminalpha = fogdomemin;
-        domemaxalpha = fogdomemax;
-        domecapsize = capsize;
-        domeclipz = fogdomeclip;
+        vec pos;
+        uchar color[4];
+
+	    vert() {}
+	    vert(const vec &pos, const bvec &fcolor, float alpha) : pos(pos)
+	    {
+		    memcpy(color, fcolor.v, 3);
+		    color[3] = uchar(alpha*255);
+	    }
+	    vert(const vert &v0, const vert &v1) : pos(vec(v0.pos).add(v1.pos).normalize())
+	    {
+            memcpy(color, v0.color, 4);
+            if(v0.pos.z != v1.pos.z) color[3] += uchar((v1.color[3] - v0.color[3]) * (pos.z - v0.pos.z) / (v1.pos.z - v0.pos.z));
+	    }
+    } *verts = NULL;
+    GLushort *indices = NULL;
+    int numverts = 0, numindices = 0, capindices = 0;
+    GLuint vbuf = 0, ebuf = 0;
+    bvec lastcolor(0, 0, 0);
+    float lastminalpha = 0, lastmaxalpha = 0, lastcapsize = -1, lastclipz = 1;
+
+    void subdivide(int depth, int face);
+
+    void genface(int depth, int i1, int i2, int i3)
+    {
+        int face = numindices; numindices += 3;
+        indices[face]   = i3;
+        indices[face+1] = i2;
+        indices[face+2] = i1;
+        subdivide(depth, face);
     }
 
-    glBindBuffer_(GL_ARRAY_BUFFER, domevbuf);
-    glBindBuffer_(GL_ELEMENT_ARRAY_BUFFER, domeebuf);
+    void subdivide(int depth, int face)
+    {
+        if(depth-- <= 0) return;
+        int idx[6];
+        loopi(3) idx[i] = indices[face+2-i];
+        loopi(3)
+        {
+            int curvert = numverts++;
+            verts[curvert] = vert(verts[idx[i]], verts[idx[(i+1)%3]]); //push on to unit sphere
+            idx[3+i] = curvert;
+            indices[face+2-i] = curvert;
+        }
+        subdivide(depth, face);
+        loopi(3) genface(depth, idx[i], idx[3+i], idx[3+(i+2)%3]);
+    }
 
-    varray::vertexpointer(sizeof(domevert), &domeverts->pos);
-    varray::colorpointer(sizeof(domevert), &domeverts->color);
-    varray::enablevertex();
-    varray::enablecolor();
+    static inline int sortcap(GLushort x, GLushort y)
+    {
+        const vec &xv = verts[x].pos, &yv = verts[y].pos;
+        return xv.y < 0 ? yv.y >= 0 || xv.x < yv.x : yv.y >= 0 && xv.x > yv.x;
+    }
 
-    glDrawRangeElements_(GL_TRIANGLES, 0, domenumverts-1, domenumindices + fogdomecap*domecapindices, GL_UNSIGNED_SHORT, domeindices);
-    xtraverts += domenumverts;
-    glde++;
+    static void init(const bvec &color, float minalpha = 0.0f, float maxalpha = 1.0f, float capsize = -1, float clipz = 1, int hres = 16, int depth = 2)
+    {
+        const int tris = hres << (2*depth);
+        numverts = numindices = capindices = 0;
+        verts = new vert[tris+1 + (capsize >= 0 ? 1 : 0)];
+        indices = new GLushort[(tris + (capsize >= 0 ? hres<<depth : 0))*3];
+        if(clipz >= 1)
+        {
+            verts[numverts++] = vert(vec(0.0f, 0.0f, 1.0f), color, minalpha); //build initial 'hres' sided pyramid
+            loopi(hres) verts[numverts++] = vert(vec(sincos360[(360*i)/hres], 0.0f), color, maxalpha);
+            loopi(hres) genface(depth, 0, i+1, 1+(i+1)%hres);
+        }
+        else if(clipz <= 0)
+        {
+            loopi(hres<<depth) verts[numverts++] = vert(vec(sincos360[(360*i)/(hres<<depth)], 0.0f), color, maxalpha);
+        }
+        else
+        {
+            float clipxy = sqrtf(1 - clipz*clipz);
+            const vec2 &scm = sincos360[180/hres];
+            loopi(hres)
+            {
+                const vec2 &sc = sincos360[(360*i)/hres];
+                verts[numverts++] = vert(vec(sc.x*clipxy, sc.y*clipxy, clipz), color, minalpha);
+                verts[numverts++] = vert(vec(sc.x, sc.y, 0.0f), color, maxalpha);
+                verts[numverts++] = vert(vec(sc.x*scm.x - sc.y*scm.y, sc.y*scm.x + sc.x*scm.y, 0.0f), color, maxalpha);
+            }
+            loopi(hres)
+            {
+                genface(depth-1, 3*i, 3*i+1, 3*i+2);
+                genface(depth-1, 3*i, 3*i+2, 3*((i+1)%hres));
+                genface(depth-1, 3*i+2, 3*((i+1)%hres)+1, 3*((i+1)%hres));
+            }
+        }
 
-    varray::disablevertex();
-    varray::disablecolor();
+        if(capsize >= 0)
+        {
+            GLushort *cap = &indices[numindices];
+            int capverts = 0;
+            loopi(numverts) if(!verts[i].pos.z) cap[capverts++] = i;
+            verts[numverts++] = vert(vec(0.0f, 0.0f, -capsize), color, maxalpha);
+            quicksort(cap, capverts, sortcap); 
+            loopi(capverts)
+            {
+                int n = capverts-1-i;
+                cap[n*3] = cap[n];
+                cap[n*3+1] = cap[(n+1)%capverts];
+                cap[n*3+2] = numverts-1;
+                capindices += 3;
+            }
+        }
 
-    glBindBuffer_(GL_ARRAY_BUFFER, 0);
-    glBindBuffer_(GL_ELEMENT_ARRAY_BUFFER, 0);
+        if(!vbuf) glGenBuffers_(1, &vbuf);
+        glBindBuffer_(GL_ARRAY_BUFFER, vbuf);
+        glBufferData_(GL_ARRAY_BUFFER, numverts*sizeof(vert), verts, GL_STATIC_DRAW);
+        DELETEA(verts);
+
+        if(!ebuf) glGenBuffers_(1, &ebuf);
+        glBindBuffer_(GL_ELEMENT_ARRAY_BUFFER, ebuf);
+        glBufferData_(GL_ELEMENT_ARRAY_BUFFER, (numindices + capindices)*sizeof(GLushort), indices, GL_STATIC_DRAW);
+        DELETEA(indices);
+    }
+
+    void cleanup()
+    {
+	    numverts = numindices = 0;
+        if(vbuf) { glDeleteBuffers_(1, &vbuf); vbuf = 0; }
+        if(ebuf) { glDeleteBuffers_(1, &ebuf); ebuf = 0; }
+    }
+
+    void draw()
+    {
+        float capsize = fogdomecap && fogdomeheight < 1 ? (1 + fogdomeheight) / (1 - fogdomeheight) : -1;
+        bvec color = fogdomecolour ? fogdomecolor : fogcolor;
+        if(!numverts || lastcolor != color || lastminalpha != fogdomemin || lastmaxalpha != fogdomemax || lastcapsize != capsize || lastclipz != fogdomeclip) 
+        {
+            init(color, min(fogdomemin, fogdomemax), fogdomemax, capsize, fogdomeclip);
+            lastcolor = color;
+            lastminalpha = fogdomemin;
+            lastmaxalpha = fogdomemax;
+            lastcapsize = capsize;
+            lastclipz = fogdomeclip;
+        }
+
+        glBindBuffer_(GL_ARRAY_BUFFER, vbuf);
+        glBindBuffer_(GL_ELEMENT_ARRAY_BUFFER, ebuf);
+
+        gle::vertexpointer(sizeof(vert), &verts->pos);
+        gle::colorpointer(sizeof(vert), &verts->color);
+        gle::enablevertex();
+        gle::enablecolor();
+
+        glDrawRangeElements_(GL_TRIANGLES, 0, numverts-1, numindices + fogdomecap*capindices, GL_UNSIGNED_SHORT, indices);
+        xtraverts += numverts;
+        glde++;
+
+        gle::disablevertex();
+        gle::disablecolor();
+
+        glBindBuffer_(GL_ARRAY_BUFFER, 0);
+        glBindBuffer_(GL_ELEMENT_ARRAY_BUFFER, 0);
+    }
 }
 
 void cleanupsky()
 {
-    deletedome();
+    dome::cleanup();
 }
-
-VAR(showsky, 0, 1, 1); 
-VAR(clampsky, 0, 1, 1);
-
-VARR(fogdomeclouds, 0, 1, 1);
 
 static void drawfogdome(int farplane)
 {
@@ -373,11 +373,13 @@ static void drawfogdome(int farplane)
     skyprojmatrix.mul(projmatrix, skymatrix);
     LOCALPARAM(skymatrix, skyprojmatrix);
 
-    drawdome();
+    dome::draw();
 
     glDisable(GL_BLEND);
 }
 
+VAR(showsky, 0, 1, 1);
+VAR(clampsky, 0, 1, 1);
 VARNR(skytexture, useskytexture, 0, 0, 1);
 VARFR(skyshadow, 0, 0, 1, clearshadowcache());
 
@@ -402,17 +404,17 @@ void drawskybox(int farplane)
         glDepthFunc(GL_LEQUAL);
         glDepthMask(GL_FALSE);
     }
-    
-    if(ldrscale < 1 && skyboxoverbright > 1 && skyboxoverbrightthreshold < 1)
+   
+    if(ldrscale < 1 && (skyboxoverbrightmin != 1 || (skyboxoverbright > 1 && skyboxoverbrightthreshold < 1)))
     {
         SETSHADER(skyboxoverbright);
-        LOCALPARAMF(overbrightparams, (skyboxoverbright-1, skyboxoverbrightthreshold));
+        LOCALPARAMF(overbrightparams, (skyboxoverbrightmin, max(skyboxoverbright, skyboxoverbrightmin), skyboxoverbrightthreshold));
     }
     else SETSHADER(skybox);
 
     if(clampsky) glDepthRange(1, 1);
 
-    varray::color(vec::hexcolor(skyboxcolour));
+    gle::color(vec::hexcolor(skyboxcolour));
 
     glmatrix skymatrix = cammatrix, skyprojmatrix;
     skymatrix.d = vec4(0, 0, 0, 1);
@@ -434,7 +436,7 @@ void drawskybox(int farplane)
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-        varray::color(vec::hexcolor(cloudboxcolour), cloudboxalpha);
+        gle::color(vec::hexcolor(cloudboxcolour), cloudboxalpha);
 
         skymatrix = cammatrix;
         skymatrix.d = vec4(0, 0, 0, 1);

@@ -12,13 +12,6 @@ namespace entities
 
     void readent(entity &e, char *buf, int ver)     // read from disk, and init
     {
-        if(ver <= 30) switch(e.type)
-        {
-            case FLAG:
-            case TELEDEST:
-                e.attr1 = (int(e.attr1)+180)%360;
-                break;
-        }
     }
 
 #ifndef STANDALONE
@@ -122,7 +115,7 @@ namespace entities
             {
                 vec p = e.o;
                 p.z += 1+sinf(lastmillis/100.0+e.o.x+e.o.y)/20;
-                rendermodel(mdlname, ANIM_MAPMODEL|ANIM_LOOP, p, lastmillis/(float)revs, 0, MDL_CULL_VFC | MDL_CULL_DIST | MDL_CULL_OCCLUDED);
+                rendermodel(mdlname, ANIM_MAPMODEL|ANIM_LOOP, p, lastmillis/(float)revs, 0, 0, MDL_CULL_VFC | MDL_CULL_DIST | MDL_CULL_OCCLUDED);
             }
         }
     }

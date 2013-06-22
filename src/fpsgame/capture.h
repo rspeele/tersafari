@@ -350,7 +350,7 @@ struct captureclientmode : clientmode
             baseinfo &b = bases[i];
             if(!b.valid()) continue;
             const char *basename = b.owner[0] ? (strcmp(b.owner, player1->team) ? "base/red" : "base/blue") : "base/neutral";
-            rendermodel(basename, ANIM_MAPMODEL|ANIM_LOOP, b.o, 0, 0, MDL_CULL_VFC | MDL_CULL_OCCLUDED);
+            rendermodel(basename, ANIM_MAPMODEL|ANIM_LOOP, b.o, 0, 0, 0, MDL_CULL_VFC | MDL_CULL_OCCLUDED);
             float fradius = 1.0f, fheight = 0.5f;
             regular_particle_flame(PART_FLAME, vec(b.ammopos.x, b.ammopos.y, b.ammopos.z - 4.5f), fradius, fheight, b.owner[0] ? (strcmp(b.owner, player1->team) ? 0x802020 : 0x2020FF) : 0x208020, 3, 2.0f);
             //regular_particle_flame(PART_SMOKE, vec(b.ammopos.x, b.ammopos.y, b.ammopos.z - 4.5f + 4.0f*min(fradius, fheight)), fradius, fheight, 0x303020, 1, 4.0f, 100.0f, 2000.0f, -20);
@@ -364,7 +364,7 @@ struct captureclientmode : clientmode
                 abovemodel(height, ammoname);
                 vec ammopos(b.ammopos);
                 ammopos.z -= height.z/2 + sinf(lastmillis/100.0f)/20;
-                rendermodel(ammoname, ANIM_MAPMODEL|ANIM_LOOP, ammopos, lastmillis/10.0f, 0, MDL_CULL_VFC | MDL_CULL_OCCLUDED);
+                rendermodel(ammoname, ANIM_MAPMODEL|ANIM_LOOP, ammopos, lastmillis/10.0f, 0, 0, MDL_CULL_VFC | MDL_CULL_OCCLUDED);
             }
             else loopj(b.ammo)
             {
@@ -373,7 +373,7 @@ struct captureclientmode : clientmode
                 ammopos.x += 10*cosf(angle);
                 ammopos.y += 10*sinf(angle);
                 ammopos.z += 4;
-                rendermodel(entities::entmdlname(I_SHELLS+b.ammotype-1), ANIM_MAPMODEL|ANIM_LOOP, ammopos, 0, 0, MDL_CULL_VFC | MDL_CULL_OCCLUDED);
+                rendermodel(entities::entmdlname(I_SHELLS+b.ammotype-1), ANIM_MAPMODEL|ANIM_LOOP, ammopos, 0, 0, 0, MDL_CULL_VFC | MDL_CULL_OCCLUDED);
             }
 
             int tcolor = 0x1EC850, mtype = -1, mcolor = 0xFFFFFF, mcolor2 = 0;
@@ -442,19 +442,19 @@ struct captureclientmode : clientmode
             {
                 if(!blips) 
                 {
-                    varray::defvertex(2);
-                    varray::deftexcoord0();
-                    varray::begin(GL_QUADS);
+                    gle::defvertex(2);
+                    gle::deftexcoord0();
+                    gle::begin(GL_QUADS);
                 }
                 float x = 0.5f*(dir.x*fw/blipsize - fw), y = 0.5f*(dir.y*fh/blipsize - fh);
-                varray::attribf(x,    y);    varray::attribf(0, 0);
-                varray::attribf(x+fw, y);    varray::attribf(1, 0);
-                varray::attribf(x+fw, y+fh); varray::attribf(1, 1);
-                varray::attribf(x,    y+fh); varray::attribf(0, 1);
+                gle::attribf(x,    y);    gle::attribf(0, 0);
+                gle::attribf(x+fw, y);    gle::attribf(1, 0);
+                gle::attribf(x+fw, y+fh); gle::attribf(1, 1);
+                gle::attribf(x,    y+fh); gle::attribf(0, 1);
             }
             blips++;
         }
-        if(blips && !basenumbers) varray::end();
+        if(blips && !basenumbers) gle::end();
     }
 
     int respawnwait(fpsent *d)
@@ -472,12 +472,12 @@ struct captureclientmode : clientmode
     {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         int s = 1800/4, x = 1800*w/h - s - s/10, y = s/10;
-        varray::colorf(1, 1, 1, minimapalpha);
+        gle::colorf(1, 1, 1, minimapalpha);
         if(minimapalpha >= 1) glDisable(GL_BLEND);
         bindminimap();
         drawminimap(d, x, y, s);
         if(minimapalpha >= 1) glEnable(GL_BLEND);
-        varray::colorf(1, 1, 1);
+        gle::colorf(1, 1, 1);
         float margin = 0.04f, roffset = s*margin, rsize = s + 2*roffset;
         settexture("packages/hud/radar.png", 3);
         drawradar(x - roffset, y - roffset, rsize);

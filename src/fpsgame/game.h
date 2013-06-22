@@ -24,7 +24,7 @@ enum                            // static entity types
 {
     NOTUSED = ET_EMPTY,         // entity slot not in use in map
     LIGHT = ET_LIGHT,           // lightsource, attr1 = radius, attr2 = intensity
-    MAPMODEL = ET_MAPMODEL,     // attr1 = angle, attr2 = idx
+    MAPMODEL = ET_MAPMODEL,     // attr1 = idx, attr2 = yaw, attr3 = pitch, attr4 = roll, attr5 = scale
     PLAYERSTART,                // attr1 = angle, attr2 = team
     ENVMAP = ET_ENVMAP,         // attr1 = radius
     PARTICLES = ET_PARTICLES,
@@ -270,9 +270,9 @@ static const int msgsizes[] =               // size inclusive message token, 0 f
 #define TERSAFARI_SERVER_PORT 29785
 #define TERSAFARI_SERVINFO_PORT 29786
 #define TERSAFARI_MASTER_PORT 29787
-#define PROTOCOL_VERSION 0              // bump when protocol changes
+#define PROTOCOL_VERSION 1              // bump when protocol changes
 #define DEMO_VERSION 1                  // bump when demo format changes
-#define DEMO_MAGIC "TERSAFARI_DEMO"
+#define DEMO_MAGIC "TERSAFARI_DEMO\0\0"
 
 struct demoheader
 {

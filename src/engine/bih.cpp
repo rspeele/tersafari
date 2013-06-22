@@ -261,11 +261,11 @@ BIH::BIH(vector<tri> *t)
 bool mmintersect(const extentity &e, const vec &o, const vec &ray, float maxdist, int mode, float &dist)
 {
     extern vector<mapmodelinfo> mapmodels;
-    if(!mapmodels.inrange(e.attr2)) return false;
-    model *m = mapmodels[e.attr2].m;
+    if(!mapmodels.inrange(e.attr1)) return false;
+    model *m = mapmodels[e.attr1].m;
     if(!m)
     {
-        m = loadmodel(NULL, e.attr2);
+        m = loadmodel(NULL, e.attr1);
         if(!m) return false;
     }
     if(mode&RAY_SHADOW)
@@ -275,17 +275,34 @@ bool mmintersect(const extentity &e, const vec &o, const vec &ray, float maxdist
     else if((mode&RAY_ENTS)!=RAY_ENTS && (!m->collide || e.flags&extentity::F_NOCOLLIDE)) return false;
     if(!m->bih && !m->setBIH()) return false;
     vec mo = vec(o).sub(e.o), mray(ray);
+    int scale = e.attr5;
+    if(scale > 0) mo.mul(100.0f/scale);
     float v = mo.dot(mray), inside = m->bih->radius - mo.squaredlen();
     if((inside < 0 && v > 0) || inside + v*v < 0) return false;
-    int yaw = e.attr1;
+    int yaw = e.attr2, pitch = e.attr3, roll = e.attr4;
     if(yaw != 0) 
     {
-        if(yaw < 0) yaw = 360 + yaw%360;
-        else if(yaw >= 360) yaw %= 360;
-        const vec2 &rot = sincos360[yaw];
-        mo.rotate_around_z(rot.x, -rot.y);
-        mray.rotate_around_z(rot.x, -rot.y);
+        const vec2 &rot = sincosmod360(-yaw);
+        mo.rotate_around_z(rot);
+        mray.rotate_around_z(rot);
     }
-    return m->bih->traverse(mo, mray, maxdist ? maxdist : 1e16f, dist, mode);
+    if(pitch != 0)
+    {
+        const vec2 &rot = sincosmod360(-pitch);
+        mo.rotate_around_x(rot);
+        mray.rotate_around_x(rot);
+    }
+    if(roll != 0)
+    {
+        const vec2 &rot = sincosmod360(roll);
+        mo.rotate_around_y(rot);
+        mray.rotate_around_y(rot);
+    }
+    if(m->bih->traverse(mo, mray, maxdist ? maxdist : 1e16f, dist, mode))
+    {
+        if(scale > 0) dist *= scale/100.0f;
+        return true;
+    }
+    return false;
 }
 

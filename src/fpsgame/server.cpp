@@ -543,14 +543,14 @@ namespace server
 
     int findmaprotation(int mode, const char *map)
     {
-        for(int i = curmaprotation; i < maprotations.length(); i++)
+        for(int i = max(curmaprotation, 0); i < maprotations.length(); i++)
         {
             maprotation &rot = maprotations[i];
             if(!rot.modes) break;
             if(rot.match(mode, map)) return i;
         }
         int start;
-        for(start = curmaprotation - 1; start >= 0; start--) if(!maprotations[start].modes) break;
+        for(start = max(curmaprotation, 0) - 1; start >= 0; start--) if(!maprotations[start].modes) break;
         start++;
         for(int i = start; i < curmaprotation; i++)
         {
@@ -3100,7 +3100,7 @@ namespace server
 
                 default:
                     disconnect_client(sender, DISC_MSGERR);
-                    break;
+                    return;
             }
             return;
         }
@@ -3852,8 +3852,7 @@ namespace server
     }
 
     int laninfoport() { return TERSAFARI_LANINFO_PORT; }
-    int serverinfoport(int servport) { return servport < 0 ? TERSAFARI_SERVINFO_PORT : servport+1; }
-    int serverport(int infoport) { return infoport < 0 ? TERSAFARI_SERVER_PORT : infoport-1; }
+    int serverport() { return TERSAFARI_SERVER_PORT; }
     const char *defaultmaster() { return "master.airstrafe.com"; }
     int masterport() { return TERSAFARI_MASTER_PORT; }
     int numchannels() { return 3; }
