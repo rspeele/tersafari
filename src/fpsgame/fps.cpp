@@ -356,12 +356,12 @@ namespace game
             g = rgb >> 8  & 0xff;
             b = rgb       & 0xff;
             a = ta ? ta : 0xff;
-            glColor4ub(r, g, b, a);
+//            glColor4ub(r, g, b, a);
         }
         void setalpha(int set)
         {
             a = set;
-            glColor4ub(r, g, b, a);
+//            glColor4ub(r, g, b, a);
         }
         void align(int &tx, int &ty, int tw, int th)
         {
@@ -373,24 +373,29 @@ namespace game
             int ax = x, ay = y;
             align(ax, ay, w, h);
             settexture(img);
-            glBegin(GL_TRIANGLE_STRIP);
-            glTexCoord2f(0.0f, 0.0f); glVertex2i(ax, ay);
-            glTexCoord2f(1.0f, 0.0f); glVertex2i(ax + w, ay);
-            glTexCoord2f(0.0f, 1.0f); glVertex2i(ax, ay + h);
-            glTexCoord2f(1.0f, 1.0f); glVertex2i(ax + w, ay + h);
-            glEnd();
+            varray::defvertex(2);
+            varray::deftexcoord0();
+            varray::color(bvec(r, g, b), a);
+            varray::begin(GL_TRIANGLE_STRIP);
+            varray::attribf(ax,   ay);   varray::attribf(0.0f, 0.0f);
+            varray::attribf(ax+w, ay);   varray::attribf(1.0f, 0.0f);
+            varray::attribf(ax,   ay+h); varray::attribf(0.0f, 1.0f);
+            varray::attribf(ax+w, ay+h); varray::attribf(1.0f, 1.0f);
+            varray::end();
         }
         void rectangle()
         {
             int ax = x, ay = y;
             align(ax, ay, w, h);
             enabletexture(false);
-            glBegin(GL_TRIANGLE_STRIP);
-            glVertex2i(ax, ay);
-            glVertex2i(ax + w, ay);
-            glVertex2i(ax, ay + h);
-            glVertex2i(ax + w, ay + h);
-            glEnd();
+            varray::defvertex(2);
+            varray::color(bvec(r, g, b), a);
+            varray::begin(GL_TRIANGLE_STRIP);
+            varray::attribf(ax, ay);
+            varray::attribf(ax + w, ay);
+            varray::attribf(ax, ay + h);
+            varray::attribf(ax + w, ay + h);
+            varray::end();
             enabletexture(true);
         }
         void text(char *str)
@@ -400,10 +405,11 @@ namespace game
             aw *= scale; ah *= scale;
             align(ax, ay, aw, ah);
             ax /= scale; ay /= scale;
-            glPushMatrix();
-            glScalef(scale, scale, 1.0f);
+            pushhudmatrix();
+            hudmatrix.scale(scale, scale, 1.0f);
+            flushhudmatrix();
             draw_text(str, ax, ay, r, g, b, a);
-            glPopMatrix();
+            pophudmatrix();
         }
         void textheight(int h)
         {
@@ -441,11 +447,13 @@ namespace game
                 load(customhud);
             }
             if(!code) return;
-            glPushMatrix();
-            glTranslatef(scrw * 0.5f, scrh * 0.5f, 0);
-            glScalef(scrh * 5e-4f, scrh * 5e-4f, 1);
+            pushhudmatrix();
+            hudmatrix.translate(scrw / 2, scrh / 2, 0);
+            float scale = scrh * 1.0f/2000.0f;
+            hudmatrix.scale(scale, scale, 1);
+            flushhudmatrix();
             execute(code);
-            glPopMatrix();
+            pophudmatrix();
             setfont("default");
             lastscrw = scrw;
             lastscrh = scrh;
@@ -627,7 +635,7 @@ namespace game
 
             showscores(true);
             disablezoom();
-            
+
             if(identexists("intermission")) execute("intermission");
         }
     }
@@ -842,7 +850,7 @@ namespace game
 
     const char *colorname(fpsent *d, const char *name, const char *prefix, const char *suffix, const char *alt)
     {
-        if(!name) name = alt && d == player1 ? alt : d->name; 
+        if(!name) name = alt && d == player1 ? alt : d->name;
         bool dup = !name[0] || duplicatename(d, name, alt) || d->aitype != AI_NONE;
         if(dup || prefix[0] || suffix[0])
         {
@@ -859,7 +867,7 @@ namespace game
     const char *teamcolorname(fpsent *d, const char *alt)
     {
         if(!teamcolortext || !m_teammode) return colorname(d, NULL, "", "", alt);
-        return colorname(d, NULL, isteam(d->team, player1->team) ? "\fs\f1" : "\fs\f3", "\fr", alt); 
+        return colorname(d, NULL, isteam(d->team, player1->team) ? "\fs\f1" : "\fs\f3", "\fr", alt);
     }
 
     const char *teamcolor(const char *name, bool sameteam, const char *alt)
@@ -868,8 +876,8 @@ namespace game
         cidx = (cidx+1)%3;
         formatstring(cname[cidx])(sameteam ? "\fs\f1%s\fr" : "\fs\f3%s\fr", sameteam || !alt ? name : alt);
         return cname[cidx];
-    }    
-    
+    }
+
     const char *teamcolor(const char *name, const char *team, const char *alt)
     {
         return teamcolor(name, team && isteam(team, player1->team), alt);
@@ -882,7 +890,7 @@ namespace game
             if(d->state!=CS_ALIVE) return;
             fpsent *pl = (fpsent *)d;
             if(!m_mp(gamemode)) killed(pl, pl);
-            else 
+            else
             {
                 int seq = (pl->lifesequence<<16)|((lastmillis/1000)&0xFFFF);
                 if(pl->suicided!=seq) { addmsg(N_SUICIDE, "rc", pl); pl->suicided = seq; }
@@ -1030,7 +1038,7 @@ namespace game
             text_bounds(f ? colorname(f) : " ", fw, fh);
             fh = max(fh, ph);
             draw_text("SPECTATOR", w*1800/h - tw - pw, 1650 - th - fh);
-            if(f) 
+            if(f)
             {
                 int color = f->state!=CS_DEAD ? 0xFFFFFF : 0x606060;
                 if(f->privilege)
@@ -1051,11 +1059,12 @@ namespace game
                 secs %= 60;
                 defformatstring(sn)("%d:%02d", mins, secs);
                 text_bounds(sn, tw, th);
-                glPushMatrix();
+                pushhudmatrix();
                 const float clocksize = 2.0f;
-                glScalef(clocksize, clocksize, 1.0f);
+                hudmatrix.scale(clocksize, clocksize, 1.0f);
+                flushhudmatrix();
                 draw_text(sn, middlex/clocksize - tw/2, 0);
-                glPopMatrix();
+                pophudmatrix();
             }
             const char *message = currentbroadcast();
             if(*message)
@@ -1269,4 +1278,3 @@ namespace game
         execfile("auth.cfg", false);
     }
 }
-
