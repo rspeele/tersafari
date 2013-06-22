@@ -445,9 +445,6 @@ fpsgame/scoreboard.o: shared/glexts.h shared/glemu.h shared/iengine.h
 fpsgame/scoreboard.o: shared/igame.h fpsgame/ai.h
 fpsgame/server.o: fpsgame/game.h shared/cube.h shared/tools.h shared/geom.h
 fpsgame/server.o: shared/ents.h shared/command.h shared/glexts.h
-fpsgame/server.o: shared/varray.h shared/iengine.h shared/igame.h
-fpsgame/server.o: fpsgame/ai.h fpsgame/capture.h fpsgame/ctf.h
-fpsgame/server.o: fpsgame/collect.h fpsgame/extinfo.h fpsgame/aiman.h
 fpsgame/server.o: shared/glemu.h shared/iengine.h shared/igame.h fpsgame/ai.h
 fpsgame/server.o: fpsgame/capture.h fpsgame/ctf.h fpsgame/collect.h
 fpsgame/server.o: fpsgame/extinfo.h fpsgame/aiman.h

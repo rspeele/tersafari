@@ -380,29 +380,29 @@ namespace game
             int ax = x, ay = y;
             align(ax, ay, w, h);
             settexture(img);
-            varray::defvertex(2);
-            varray::deftexcoord0();
-            varray::color(bvec(r, g, b), a);
-            varray::begin(GL_TRIANGLE_STRIP);
-            varray::attribf(ax,   ay);   varray::attribf(0.0f, 0.0f);
-            varray::attribf(ax+w, ay);   varray::attribf(1.0f, 0.0f);
-            varray::attribf(ax,   ay+h); varray::attribf(0.0f, 1.0f);
-            varray::attribf(ax+w, ay+h); varray::attribf(1.0f, 1.0f);
-            varray::end();
+            gle::defvertex(2);
+            gle::deftexcoord0();
+            gle::color(bvec(r, g, b), a);
+            gle::begin(GL_TRIANGLE_STRIP);
+            gle::attribf(ax,   ay);   gle::attribf(0.0f, 0.0f);
+            gle::attribf(ax+w, ay);   gle::attribf(1.0f, 0.0f);
+            gle::attribf(ax,   ay+h); gle::attribf(0.0f, 1.0f);
+            gle::attribf(ax+w, ay+h); gle::attribf(1.0f, 1.0f);
+            gle::end();
         }
         void rectangle()
         {
             int ax = x, ay = y;
             align(ax, ay, w, h);
             enabletexture(false);
-            varray::defvertex(2);
-            varray::color(bvec(r, g, b), a);
-            varray::begin(GL_TRIANGLE_STRIP);
-            varray::attribf(ax, ay);
-            varray::attribf(ax + w, ay);
-            varray::attribf(ax, ay + h);
-            varray::attribf(ax + w, ay + h);
-            varray::end();
+            gle::defvertex(2);
+            gle::color(bvec(r, g, b), a);
+            gle::begin(GL_TRIANGLE_STRIP);
+            gle::attribf(ax, ay);
+            gle::attribf(ax + w, ay);
+            gle::attribf(ax, ay + h);
+            gle::attribf(ax + w, ay + h);
+            gle::end();
             enabletexture(true);
         }
         void text(char *str)
