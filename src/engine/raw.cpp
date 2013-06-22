@@ -342,15 +342,18 @@ namespace rawinput
     {
         SDL_SysWMinfo info;
         SDL_VERSION(&info.version);
-        switch(SDL_GetWMInfo(&info))
+        switch(SDL_GetWindowWMInfo(screen, &info))
         {
-        case -1:
-            conoutf(CON_ERROR, "failed to get window handle");
-        case 0:
-            conoutf(CON_ERROR, "no support for system window manager information");
+        case SDL_FALSE:
+            conoutf(CON_ERROR, "failed to get window handle: %s", SDL_GetError());
             return NULL;
         default:
-            return info.window;
+            if (info.subsystem != SDL_SYSWM_WINDOWS)
+            {
+                conoutf(CON_ERROR, "attempted to use Windows raw input on another OS");
+                return NULL;
+            }
+            return info.info.win.window;
         }
     }
 
