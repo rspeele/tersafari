@@ -15,7 +15,7 @@ LICENSE
 
 Tersafari game source code, any release.
 
-Copyright (C) 2013 Robert Peele. This is a derivative work of Tersafari and Sauerbaten, see readme_tersafari.txt and readme_sauerbraten.txt for credits.
+Copyright (C) 2013 Robert Peele. This is a derivative work of Tesseract and Sauerbaten, see readme_tesseract.txt and readme_sauerbraten.txt for credits.
 
 This software is provided 'as-is', without any express or implied
 warranty.  In no event will the authors be held liable for any damages
