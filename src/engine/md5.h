@@ -420,6 +420,7 @@ struct md5 : skelmodel, skelloader<md5>
 
     bool load()
     {
+        offsetyaw = 90;
         if(loaded) return true;
         formatstring(dir)("packages/models/%s", loadname);
         defformatstring(cfgname)("packages/models/%s/md5.cfg", loadname);
