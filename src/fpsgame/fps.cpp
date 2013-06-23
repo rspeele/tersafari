@@ -309,7 +309,7 @@ namespace game
 
     bool cancrouch()
     {
-        return player1->state!=CS_DEAD && !intermission;
+        return false; //player1->state!=CS_DEAD && !intermission;
     }
 
     bool allowmove(physent *d)
