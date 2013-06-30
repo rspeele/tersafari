@@ -63,7 +63,7 @@ namespace rawinput
         }
 #endif
         int count = os_pick(name);
-        if(count > 0) enabled = true; //FIXME offer "*" as catch-all name
+        if(count > 0) enabled = true;
         else
         {
             release();
