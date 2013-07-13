@@ -50,6 +50,7 @@ struct physent                                  // base entity type, can be affe
     vec deltapos, newpos;                       // movement interpolation
     float yaw, pitch, roll;
     float maxspeed;                             // cubes per second, 90 for player
+    int wjfadetime;
     int timeinair;
     float radius, eyeheight, maxheight, aboveeye; // bounding box size
     float xradius, yradius, zmargin;
@@ -83,6 +84,7 @@ struct physent                                  // base entity type, can be affe
     {
     	inwater = 0;
         timeinair = 0;
+        wjfadetime = 0;
         eyeheight = maxheight;
         strafe = move = crouching = 0;
         physstate = PHYS_FALL;

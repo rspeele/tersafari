@@ -1275,6 +1275,7 @@ void walljump(physent *d, vec &dir, const vec &wall)
     }
     recalcdir(d, oldvel, dir);
     d->jumping = false;
+    d->wjfadetime = 750;
     game::physicstrigger(d, true, 1, 0);
 }
 
@@ -1925,9 +1926,24 @@ namespace movement
         const float current = m.vertical ? pl->vel.dot(wishdir) : pl->vel.dot2(wishdir);
         const float floatfac = floating ? floatspeed / 100.0f : 1.0f;
         const float add = wish * floatfac * m.speed - current; // scale maxspeed according to moveattrs
+        float accelfac = m.acceleration;
+        const int wjfade = pl->wjfadetime;
+        if(wjfade)
+        {
+            vec bad(pl->vel);
+            bad.z = 0;
+            bad.div(-bad.magnitude2());
+            if (wishdir.dot(bad) > 0.2f)
+            {
+                const float divisor = 0.004f * wjfade;
+                if (divisor < 1.0f) pl->wjfadetime = 0;
+                else accelfac /= divisor;
+            }
+            pl->wjfadetime = max(0, wjfade - curtime);
+        }
         if(add > 0)
         {
-            const float accel = min(add, m.acceleration * curtime * wish);
+            const float accel = min(add, accelfac * curtime * wish);
             pl->vel.add(wishdir.mul(accel));
         }
     }
