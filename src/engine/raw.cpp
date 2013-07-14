@@ -264,8 +264,8 @@ namespace rawinput
     { { WINBUTTON(LEFT_BUTTON), -SDL_BUTTON_LEFT },
       { WINBUTTON(RIGHT_BUTTON), -SDL_BUTTON_RIGHT },
       { WINBUTTON(MIDDLE_BUTTON), -SDL_BUTTON_MIDDLE },
-      { WINBUTTON(BUTTON_4), -SDL_BUTTON_X1 },
-      { WINBUTTON(BUTTON_5), -SDL_BUTTON_X2 }
+      { WINBUTTON(BUTTON_4), -6 },
+      { WINBUTTON(BUTTON_5), -7 }
     };
     static const int numbuttons = sizeof(lookup) / sizeof(buttonmap);
 
@@ -440,8 +440,8 @@ namespace rawinput
         { { BTN_LEFT, -SDL_BUTTON_LEFT },
           { BTN_RIGHT, -SDL_BUTTON_RIGHT },
           { BTN_MIDDLE, -SDL_BUTTON_MIDDLE },
-          { BTN_SIDE, -SDL_BUTTON_X1 },
-          { BTN_EXTRA, -SDL_BUTTON_X2 }
+          { BTN_SIDE, -6 },
+          { BTN_EXTRA, -7 }
         };
         static const int numbuttons = sizeof(lookup) / sizeof(buttonmap);
 
